@@ -1,0 +1,94 @@
+---
+title: " 02_bibliometrics_data_subsetting"
+author: "Mackenzie Johnson"
+date: "2026-03-07"
+output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+library(ggplot2)
+library(knitr)
+library(tidyverse)
+```
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData1}
+
+works <- readRDS(file = "data/works.rds")
+refs <- readRDS(file = "data/refs.rds")
+
+```
+
+Looking over Wood et al. (2025) (Liza, Francesca, Tyler - bibliometric analysis of "environmental governance processes"), it's obviously acceptable for me to limit the analysis to just English-language works.  But even before I get to that, I want to subset out the data by type.  Recall, there are 12 types of works included.  When I first looked at the ones marked "books" for [type], I noticed that all the ones from American Indian Quarterly are book * reviews * , not books (!) - and the first non-AIQ entry * is* a book, but it's assigned a DOI that actually matches another article in the list of works.  
+
+Maybe I should be using the [primary_source_type] instead - NOT!  All 146k+ are listed as "journal" for that variable.
+
+
+
+```{r subset based on "type" of work}
+
+works_books <- works %>% 
+  filter(type == "book") # %>%   select(work_id, type, title, doi)
+
+works_datasets <- works %>% 
+  filter(type == "dataset") # %>%   select(work_id, type, title, doi)
+
+n_distinct(works$primary_source_type)  
+# [1] 1 - which means they're all "journal" ... 
+# so I can easily SELECT out this variable ...
+# and it also means if I'm going to subset based on type of work, it has to be done using the [type] variable
+
+works_errata <- works %>% 
+  filter(type == "erratum") # %>%   select(work_id, type, title, doi)
+
+
+
+```
+
+
+
+
+
+```{r limit to English-language}
+
+
+
+```
+
+
+
+
+
+```{r Data Exploration - "works" - publication dates }
+
+
+```
+
+
+
+ 
+
+```{r Data Exploration - "works" - filter potential 1 }
+
+
+```
+
+
+
+
+```{r Data Exploration - "works" - filter potential 2 }
+
+
+```
+

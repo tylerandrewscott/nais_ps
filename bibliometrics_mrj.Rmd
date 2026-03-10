@@ -1,5 +1,5 @@
 ---
-title: " Bibliometric NAIS-PS study: data exploration"
+title: " 01_bibliometrics_data_exploration"
 author: "Mackenzie Johnson"
 date: "2026-03-05"
 # output: html_document
@@ -251,3 +251,7 @@ tally_primary_topic_field <- count(works, primary_topic_field, sort = TRUE, name
 
 ```
 
+
+##  7 March 2026
+
+Reading through Wood et al. 2025 (Liza's paper with Tyler and Francesca), obviously it's OK to limit the analysis to just the English-language references.  
