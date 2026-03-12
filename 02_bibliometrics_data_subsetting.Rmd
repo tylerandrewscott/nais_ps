@@ -105,8 +105,54 @@ refs_overlap <- intersect(refs_citing, refs_cited)
 # ?intersect
   # column names have to be the same!!
 
-refs_citing_renamed <- refs_citing %>% 
-  rename(citing_id = citation)
+# refs_citing_renamed <- refs_citing %>% 
+  # rename(citing_id = citation)
+
+  # Error in `rename()`:
+  # ! Can't rename columns that don't exist.
+  # ✖ Column `citation` doesn't exist.
+  # Run `rlang::last_trace()` to see where the error occurred.
+
+
+refs_citing <- refs %>% 
+  select(-cited_id, citation = citing_id)
+
+refs_cited <- refs %>% 
+  select(-citing_id, citation = cited_id)
+
+refs_overlap <- intersect(refs_citing, refs_cited)
+typeof(refs_overlap) # [1] "list"
+class(refs_overlap)  # [1] "data.table" "data.frame"
+
+n_distinct(refs_overlap$citation)  # [1] 60584
+
+# um...that's surprising
+# need to back up - it worked as expected, giving me a df with one row for each of the ids found in both the citing and cited
+
+# tally_refs_overlap <- count(refs_overlap, citation, sort = TRUE, name = "tally")
+# min(tally_refs_overlap$tally)
+# max(tally_refs_overlap$tally)
+
+refs_citing_grouped <- refs_citing %>% 
+  group_by(citation)
+
+length(refs_citing_grouped$citation)  # [1] 602219
+
+# ok, so none of the citing_ids are repeated?
+# that can't possibly be right:
+
+n_distinct(refs_citing_grouped$citation)  # [1] 79643
+
+refs_cited_grouped <- refs_cited %>% 
+  group_by(citation)
+
+length(refs_cited_grouped$citation)  # # [1] 602219
+
+
+# and none of the cited IDs are repeated ??
+# that can't possibly be right!  
+
+n_distinct(refs_cited_grouped$citation)  # [1] 73405
 
 ```
 
