@@ -1,0 +1,274 @@
+---
+title: " 01_bibliometrics_data_exploration"
+author: "Mackenzie Johnson"
+date: "2026-03-05"
+# output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+library(ggplot2)
+library(knitr)
+library(tidyverse)
+```
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData1}
+
+works <- readRDS(file = "data/works.rds")
+refs <- readRDS(file = "data/refs.rds")
+
+```
+
+
+Now that I have the 2 RDS files Tyler created, I need to explore the data.  
+1) Based on the below, it seems like there are 6,457 articles that represent cross-over:  they were both an original article and an article that was cited by one of the other original articles.  [Will eventually need to subset those articles, but want to explore "works" some more first.]
+
+
+```{r Data Exploration - mostly "refs" }
+
+str(refs)
+# Classes ‘data.table’ and 'data.frame':	602219 obs. of  2 variables
+# "$ citing_id" and "$ cited_id"
+
+n_distinct(refs$citing_id)  # [1] 79643
+n_distinct(refs$cited_id)  # [1] 73405
+n_distinct(works)  # [1] 146591
+
+sum(n_distinct(refs$citing_id), n_distinct(refs$cited_id))  # [1] 153048
+
+# that's more than the total of "works" 
+
+sum(n_distinct(refs$citing_id), n_distinct(refs$cited_id), -n_distinct(works))  # [1] 6457
+
+```
+
+
+2) "source_id" = assuming this identifies which journal it's from...but this doesn't add up:  there are 20 journals in the "ep_sources" file, 25 in the "nais_sources" file, and 20 in the "ps_sources" file - so there should be 65 unique values for "source_id" but there are only 63.  [Will want to figure out which 2 journals from the 3 source files aren't included - and why.]
+
+Fortunately, the number of unique values for "primary_source_display_name" matches.  The dataframe "tally_journal" shows all 63 journals in descending order by how many times it appears in the "works" rds file.  Quick skim:  not sure what "Boraspati" is or how it made into the search.
+
+Don't want to print the full journal tally here, but the simpler source_group tally is also interesting.  
+
+      source_group  tally
+    1           ep 72498
+    2           ps 47732
+    3         nais 26361
+
+3) Not sure what the "pmid" is...?  [20260305 - Slacked Tyler to confirm it's the PubMed Identifier - if so, will remove from subset]
+
+4) Also not sure what "mag" is - thought it might be related to journal name, but there are not the same number of unique "mag" values as there are unique "primary_source_display_name" values - to me that says mag must be something else.  The number is the same as the Work id, just without the initial "w" of the latter.  [20260305 - slacked Tyler for clarification, later deleted the message because I found the answer online:  it's the "Microsoft Academic Graph" id.]
+
+5) As for the "primary_source_issn_l" - tallying up the unique number of values here, I only got 62, but was expecting 63.  But then when I filter out the rows for which that variable == "NA", I get 2 observations, not just 1...which, would make sense if some of the works from 1 of the sources had an issn for some of the articles, but comparing these totals to the full set, it looks like ALL of the articles in both of these journals are missing an issn...  
+  
+    primary_source_display_name                         tally
+    1 The Journal of American Indian Education            411
+    2 Decolonization: Indigeneity, Education & Society    93
+ 
+That covers all of the articles in both journals; similarly, all of the articles from Decolonization don't have a DOI, nor do most of the articles from  The Journal of American Indian Education (395 of the 411) (see below).  
+
+```{r Data Exploration - sources }
+
+head(works)  # doesn't work, but doesn't give any error or warning either
+str(works)  # Classes ‘data.table’ and 'data.frame':	146591 obs. of  35 variables
+typeof(works)  # [1] "list"
+class(works)  # [1] "data.table" "data.frame"
+
+names(works)
+n_distinct(works$source_id) # [1] 63
+# source_id_count <- count(works, source_id, sort = TRUE, name = "tally")
+# view(source_id_count)
+# kindof useless without having to cross-reference to journal name
+
+n_distinct(works$primary_source_display_name)  # [1] 63
+tally_journal <- count(works, primary_source_display_name, sort = TRUE, name = "tally")
+
+
+# tally2_journal <- count(works, primary_source_display_name, sort = FALSE, name = "tally") 
+# this is if you want the list ordered alphabetically ("sort = FALSE")
+
+n_distinct(works$source_group)  # [1] 3
+tally_source_group <- count(works, source_group, sort = TRUE, name = "tally")
+# print(tally_source_group)
+
+n_distinct(works$pmid)  # [1] 2375
+# I THINK pmid is the PubMed Identifier - meaning, only 2375 of the articles are found in a journal tracked by PubMed
+
+n_distinct(works$mag)  # [1] 101856
+
+n_distinct(works$primary_source_issn_l)  # [1] 62 ... um...I was expecting 63 ...
+
+tally_journal_issn <- count(works, primary_source_issn_l, sort = TRUE, name = "tally")
+# comparing these total against the "journal_tally" - see it's "Decolonization" that doesn't have an issn
+# but...really shouldn't be doing that by hand...
+
+journal_no_issn <- works %>% 
+  filter(is.na(primary_source_issn_l))
+
+tally_journal_no_issn <- count(journal_no_issn, primary_source_display_name, sort = TRUE, name = "tally")
+print(tally_journal_no_issn)  # Classes ‘data.table’ and 'data.frame':	2 obs. of  2 variables
+
+# wait, if there are 2 journals that don't have issn values, shouldn't the number of unique values for that variable be 61?
+# oh!! it's because "NA" is included as a unique value!  Duh...good thing I checked
+
+```
+
+
+6) The fact that 2 of the publication dates are entered as "1800" is curious...these (from "PAR" and "Ethnic Studies")and the one from 1929 (from "American Indian Quarterly") don't have DOI numbers...how common is it for the articles not to have DOI numbers?
+
+In fact, 2161 of the articles don't:  they are coming from all 3 source groups, though more are from the NAIS journals
+
+    source_group  tally
+    1         nais  1368
+    2           ep   502
+    3           ps   291
+
+
+```{r Data Exploration - "works" - publication dates }
+
+min(works$publication_year)  # [1] 1800
+max(works$publication_year) # [1] 2026
+
+na_doi <- works %>% filter(is.na(doi))
+nrow(na_doi)  # [1] 2161
+n_distinct(na_doi$source_group)  # [1] 3
+
+tally_na_doi_source_group <- count(na_doi, source_group, sort = TRUE, name = "tally")
+# print(tally_na_doi_source_group)
+
+tally_na_doi_journal <- count(na_doi, primary_source_display_name, sort = TRUE, name = "tally")
+
+# p <- ggplot(data = works, aes(x = publication_year)) + 
+#  geom_histogram()
+
+# p  ->  created a huge histogram, that wasn't really that informative - copied into a note to myself in Slack
+```
+
+
+7) Looking at the type of works that are included, I am surprised by the variety - definitely could filter out some of these
+ 
+                        type  tally
+    1                  article 138993
+    2                 paratext   4141
+    3                   review   1303
+    4                editorial    883
+    5                  erratum    471
+    6                 preprint    354
+    7             book-chapter    318
+    8                   letter     69
+    9                     book     38
+    10                   other     17
+    11                 dataset      3
+    12 supplementary-materials      1
+ 
+
+```{r Data Exploration - "works" - filter potential 1 }
+
+n_distinct(works$type)  # [1] 12
+tally_type <- count(works, type, sort = TRUE, name = "tally")
+# print(tally_type)
+
+```
+
+
+8) Looking at the languages: 144,111 of the 146,591 are in English - and there are 32 unique values for language (though one of them is "NA" ...?)  (for full breakdown, see "tally_lang")
+
+9) Could also filter out those articles that were retracted - but what to do about the "NA" values?
+  
+      is_retracted  tally
+    1        FALSE 145245
+    2           NA   1293
+    3         TRUE     53
+  
+
+10) What to do with the small number of paratext sources?  (From U Michigan:  "The paratext is everything in a book or manuscript that’s not the author’s words: illustrations, footnotes, font and layout, quality of materials, the size or shape of the pages.")
+  
+      is_paratext  tally
+    1       FALSE 145248
+    2        TRUE   1343
+  
+
+11) What to do with the fact that only a small fraction of the works have the full text?  Should it matter if I have the DOI and/or the title of the work?  
+  
+      has_fulltext  tally
+    1        FALSE 137896
+    2         TRUE   8695
+     
+
+12)  Regarding "open access" status:  was expecting the number of "FALSE" values (n = 113,473) for "oa_is_oa" variable to match the number of "closed" values (n = 113, 473) for the "oa_status" variable ... but they don't match (off by 24,423).  I do think open-access status will be important to track because of the marginalizing effect of paywalls.  (I included a discussion of this in my original paper from a few years ago.)
+
+13)  Based on topic/field:  
+  a)  primary topic will probably not be particularly useful (n = 2,554), though it might be good to consider those topics that account for a certain percentage of the works
+
+  b)  similar problem / strategy for the subfield (n = 221)
+
+  c)  opposite problem for the primary topic domain (n = 5, and one of those is "NA")
+            
+            primary_topic_domain tally
+        1      Social Sciences 81664
+        2    Physical Sciences 41708
+        3                 <NA> 16026
+        4      Health Sciences  4291
+        5        Life Sciences  2902
+    
+  d) maybe the best option will be to consider the primary topic field (n = 27)
+        
+
+```{r Data Exploration - "works" - filter potential 2 }
+
+n_distinct(works$language)  # [1] 32
+tally_lang <- count(works, language, sort = TRUE, name = "tally")
+
+
+n_distinct(works$is_retracted)
+# print(count(works, is_retracted, sort = TRUE, name = "tally"))
+
+# print(count(works, is_paratext, sort = TRUE, name = "tally"))
+
+# print(count(works, has_fulltext, sort = TRUE, name = "tally"))
+
+# print(count(works, oa_is_oa, sort = TRUE, name = "tally"))
+
+# print(count(works, oa_status, sort = TRUE, name = "tally"))
+
+n_distinct(works$primary_topic)  # [1] 2554
+n_distinct(works$primary_topic_domain)  # [1] 5
+n_distinct(works$primary_topic_field)  # [1] 27
+n_distinct(works$primary_topic_subfield)  # [1] 221
+
+# print(count(works, primary_topic_domain, sort = TRUE, name = "tally"))
+tally_primary_topic_field <- count(works, primary_topic_field, sort = TRUE, name = "tally")
+
+```
+
+
+##  11 March 2026
+
+Going back over notes from the other day, want to see if it seems like there are differences between the 3 source groups for the (potential) collaboration variables, the fwci, and maybe the numbers of some of the binary variables.  
+
+All of this could be useful, and can run a test of signifcance later - but for now, it's still unfiltered data - need to re-run this after I've filtered by language, type, and is.retracted.  
+
+``` {r Data Exploration - "works" - select potential}
+
+source_group_difs <- works %>% 
+  filter(!is.na(fwci)) %>% 
+  group_by(source_group) %>% 
+  summarise(mean_cited = mean(cited_by_count),
+            mean_references = mean(referenced_works_count),
+            mean_locations = mean(locations_count),
+            mean_countries = mean(countries_distinct_count),
+            mean_institutions = mean(institutions_distinct_count), 
+            mean_fwci = mean(fwci))
+
+```
+

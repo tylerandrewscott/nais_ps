@@ -1,7 +1,7 @@
 ---
 title: " 02_bibliometrics_data_subsetting"
 author: "Mackenzie Johnson"
-date: "2026-03-07"
+date: "20260307_11"
 output: html_document
 ---
   
@@ -36,7 +36,7 @@ Maybe I should be using the [primary_source_type] instead - NOT!  All 146k+ are 
 
 
 
-```{r subset based on "type" of work}
+```{r subsetting the "works" rds}
 
 works_books <- works %>% 
   filter(type == "book") # %>%   select(work_id, type, title, doi)
@@ -44,7 +44,7 @@ works_books <- works %>%
 works_datasets <- works %>% 
   filter(type == "dataset") # %>%   select(work_id, type, title, doi)
 
-n_distinct(works$primary_source_type)  
+# n_distinct(works$primary_source_type)  
 # [1] 1 - which means they're all "journal" ... 
 # so I can easily SELECT out this variable ...
 # and it also means if I'm going to subset based on type of work, it has to be done using the [type] variable
@@ -52,17 +52,61 @@ n_distinct(works$primary_source_type)
 works_errata <- works %>% 
   filter(type == "erratum") # %>%   select(work_id, type, title, doi)
 
+filtered_works <- works %>% 
+  filter(language == "en") %>% 
+  filter(type == "article") %>% 
+  filter(is_retracted == "FALSE") %>% 
+  select(-pmid, -mag, -primary_source_issn_l, -language, -type, -is_retracted, -is_paratext, -primary_source_type, -created_date, -updated_date)
 
+#  want to test to make sure the filtering worked
+n_distinct(filtered_works$language)  # [1] 1  IT WORKED
+n_distinct(filtered_works$type)  # [1] 1  IT WORKED
+n_distinct(filtered_works$is_retracted)  # [1] 1  IT WORKED
+n_distinct(filtered_works$is_paratext)  # [1] 1  Didn't filter by this, but this is the expected result
+
+# now I can go back and select out more columns
+# end result for now is 25 variables
+    # could probably select out more, but want to look at more bibliometric analyses first
 
 ```
 
 
+Now want to try working with the "refs.rds" file.  1) I want to figure out how to get just the articles that appear in both columns.  Looked online: will try INTERSECT function first.  2) I want to somehow filter it by just those articles that were cited at least 5 times (per Wood et al. 2025).  
 
 
+```{r subsetting the "works" rds}
 
-```{r limit to English-language}
+# First, try getting a dataframe of just those articles that appear in both columns (citing and cited)
 
+refs_overlap <- refs %>% 
+  intersect(citing_id, cited_id)
 
+  # Error in `intersect()`:
+  # ! `...` must be empty.
+  # ✖ Problematic argument:
+  # • ..1 = cited_id
+  # ℹ Did you forget to name an argument?
+  # Run `rlang::last_trace()` to see where the error occurred.
+
+refs_citing <- refs %>% 
+  select(-cited_id)
+
+refs_cited <- refs %>% 
+  select(-citing_id)
+
+refs_overlap <- intersect(refs_citing, refs_cited)
+
+  # Error in `intersect()`:
+  # ! `x` and `y` are not compatible.
+  # ✖ Cols in `y` but not `x`: `cited_id`.
+  # ✖ Cols in `x` but not `y`: `citing_id`.
+  # Run `rlang::last_trace()` to see where the error occurred.
+
+# ?intersect
+  # column names have to be the same!!
+
+refs_citing_renamed <- refs_citing %>% 
+  rename(citing_id = citation)
 
 ```
 
