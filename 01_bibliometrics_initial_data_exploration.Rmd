@@ -258,8 +258,9 @@ Going back over notes from the other day, want to see if it seems like there are
 
 All of this could be useful, and can run a test of signifcance later - but for now, it's still unfiltered data - need to re-run this after I've filtered by language, type, and is.retracted.  
 
-``` {r Data Exploration - "works" - select potential}
 
+```{r Data Exploration - differences between source groups}
+ 
 source_group_difs <- works %>% 
   filter(!is.na(fwci)) %>% 
   group_by(source_group) %>% 
@@ -272,3 +273,93 @@ source_group_difs <- works %>%
 
 ```
 
+
+Also need to look at more of the variables to see which ones I REALLY need to keep
+
+``` {r Data Exploration - "works" - select potential}
+
+works_books <- works %>% 
+   filter(type == "book") # %>%   select(work_id, type, title, doi)
+
+works_datasets <- works %>% 
+   filter(type == "dataset") # %>%   select(work_id, type, title, doi)
+
+n_distinct(works$primary_source_type)  
+  # [1] 1 - which means they're all "journal" ... 
+  # so I can easily SELECT out this variable ...
+  # and it also means if I'm going to subset based on type of work, it has to be done using the [type] variable
+
+works_errata <- works %>% 
+  filter(type == "erratum") # %>%   select(work_id, type, title, doi)
+
+```
+
+
+##  15 March 2026
+
+Still figuring out how much to filter.  From the first chunk, seems like the only thing to filter out of the dates are those entries from 2026.
+
+From the second chunk, here are the categories with "NA" values: "title" (which also has blank values), "language" (which I already plan to filter, keeping just "en" entries), "fwci", "is_retracted", and all 4 "primary_topic" variables.  
+
+
+```{r Data exploration -  "works" - publication dates }
+
+tally_dates <- works %>% 
+  count(publication_year, sort = TRUE, name = "tally")
+
+str(tally_dates)  # Classes ‘data.table’ and 'data.frame':	89 obs. of  2 variables
+
+# min(tally_dates$publication_year)  # [1] 1800
+# max(tally_dates)  [1] 6690
+
+# these last 2 lines are kindof useless, but...
+# once I finish filtering/selecting - looking at changes over time will be important
+# cursory observation: mostly gradual increase, but some years show big jump
+# would want to run test of significance to see if spikes are worth investigating
+
+```
+
+
+```{r Data exporation - "works" - NA values}
+
+# Even the "title" variable has blanks
+
+print(count(works, title == ""))
+    #           <lgcl>  <int>
+    # 1:       FALSE 144774
+    # 2:        TRUE    524
+    # 3:          NA   1293
+
+# below are all the tests for how many "NA" values each variable has
+
+print(count(works, is.na(title)))  # 2: TRUE   1293
+
+print(count(works, is.na(publication_year)))  # 1: FALSE 146591 -- as in, all of them, so no NA values
+print(count(works, is.na(publication_date)))  # 1: FALSE 146591 -- as in, all of them, so no NA values
+print(count(works, is.na(type)))  # 1: FALSE 146591 -- as in, all of them, so no NA values
+
+print(count(works, is.na(language)))  # 2: TRUE   738
+
+print(count(works, is.na(cited_by_count)))   # 1: FALSE 146591 -- as in, all of them, so no NA values
+print(count(works, is.na(referenced_works_count)))  # 1: FALSE 146591 -- as in, all of them, so no NA values
+print(count(works, is.na(locations_count)))  # 1: FALSE 146591 -- as in, all of them, so no NA values
+print(count(works, is.na(countries_distinct_count)))  # 1: FALSE 146591 -- as in, all of them, so no NA values
+print(count(works, is.na(institutions_distinct_count)))  # 1: FALSE 146591 -- as in, all of them, so no NA values
+
+print(count(works, is.na(fwci)))  # 2: TRUE   16084
+print(count(works, is.na(is_retracted)))  # 2: TRUE   1293
+
+print(count(works, is.na(is_paratext)))  # 1: FALSE 146591 -- as in, all of them, so no NA values
+print(count(works, is.na(has_fulltext)))
+print(count(works, is.na(oa_is_oa)))
+print(count(works, is.na(oa_status)))
+
+print(count(works, is.na(primary_topic)))  # 2: TRUE   16026
+print(count(works, is.na(primary_topic_subfield)))  # 2: TRUE   16026
+print(count(works, is.na(primary_topic_field)))  # 2: TRUE   16026
+print(count(works, is.na(primary_topic_domain)))  # 2: TRUE   16026
+
+print(count(works, is.na(primary_source_display_name)))  # 1: FALSE 146591 -- as in, all of them, so no NA values
+
+
+```
