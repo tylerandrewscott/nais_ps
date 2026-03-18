@@ -39,9 +39,11 @@ I can also limit the data to those articles that were NOT retracted.
 
 ```{r subsetting the "works" rds}
 
+# originally had this filtered to just "articles" but based on Wood et al. (2025), decided to also keep "reviews"2101?base
+
 filtered_works <- works %>% 
   filter(language == "en") %>% 
-  filter(type == "article") %>% 
+  filter(type == "article" | type == "review") %>% 
   filter(is_retracted == "FALSE") %>% 
   select(-pmid, -mag, -primary_source_issn_l, -language, -type, -is_retracted, -is_paratext, -primary_source_type, -created_date, -updated_date)
 
@@ -56,22 +58,36 @@ n_distinct(filtered_works$is_paratext)  # [1] 1  Didn't filter by this variable,
     # could probably select out more, but want to look at more bibliometric analyses first
 
 # maybe I should filter out anything from 2026...?
-    # count(filtered_works, publication_year == 2026)  # TRUE	1120	
-
+# print(count(filtered_works, publication_year == 2026))  	
+    # publication_year == 2026      n
+    # 1                    FALSE 135832
+    # 2                     TRUE   1120  
+    
 # so if I filter out those, the "filtered_works" should have 135,832 observations
 
 filtered_works <- filtered_works %>% 
-  filter(publication_year != 2026)
+  filter(publication_year != 2026) # 
 
+# str(filtered_works)  # 135832 obs. of  25 variables (means it worked)
+
+# also want to filter out anything without a title
 # print(count(filtered_works, title == ""))
+    # title == ""      n
+    # 1       FALSE 135619
+    # 2        TRUE    213
+
 
 filtered_works <- filtered_works %>% 
-  filter(title != "")
+  filter(title != "") 
+
+# can see from the data in the Global Environment that it worked
+
+
 
 ```
 
 
-Now want to try working with the "refs.rds" file.  1) I want to somehow filter it by just those articles that were cited at least 5 times (per Wood et al. 2025)  
+Now want to try working with the "refs.rds" file.  1) I want to somehow filter it to just those articles that were cited at least 5 times (per Wood et al. 2025)  
 
 2) Once I have filtered it down to only those references with 5 or more citations, I want to figure out how to get just the articles that appear in both columns.  Looked online: will try INTERSECT function first.  For this, I already made some progress in the "practice" file - see comments in the code chunk below. 
 

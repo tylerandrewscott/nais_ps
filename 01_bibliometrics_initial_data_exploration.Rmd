@@ -93,6 +93,12 @@ n_distinct(works$source_id) # [1] 63
 n_distinct(works$primary_source_display_name)  # [1] 63
 tally_journal <- count(works, primary_source_display_name, sort = TRUE, name = "tally")
 
+journal_SID <- works %>% 
+  group_by(primary_source_display_name) %>% 
+  # summarize(tally = count(primary_source_display_name)) %>% 
+  select(source_id, primary_source_display_name) %>% 
+  unique()
+
 
 # tally2_journal <- count(works, primary_source_display_name, sort = FALSE, name = "tally") 
 # this is if you want the list ordered alphabetically ("sort = FALSE")
@@ -178,6 +184,8 @@ n_distinct(works$type)  # [1] 12
 tally_type <- count(works, type, sort = TRUE, name = "tally")
 # print(tally_type)
 
+# length(unique(works$type))  # [1] 12
+# (This is another way to get the same information - it's how how Liza did it)
 ```
 
 
