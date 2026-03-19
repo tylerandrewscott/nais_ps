@@ -148,9 +148,6 @@ n_distinct(filtered_refs_overlap$citation)  # [1] 18977 - this matches the lengt
 ```
 
 
-
-
-
  
 
 ```{r Data Exploration - "filtered_works" - works with no references }
@@ -184,6 +181,14 @@ tally_no_refs_by_journal <- filtered_works %>%
 filtered_works <- filtered_works %>% 
   filter(primary_source_display_name != "Boraspati Journal Journal of Bilingualism Organization Research Articles Studies in Pedagogy Anthropology Theory and Indigenous Cultures")
 
+```
+
+
+```{r subsetting the filtered works to match the overlapping refs}
+
+# lots of options
+# start with "%in%" and then test the different join functions
+
 test <- filtered_works %>% 
   filter(work_id %in% filtered_refs_overlap$citation)
 
@@ -214,6 +219,9 @@ print(count(test5, is.na(work_id)))  # 1:          FALSE 126790  --  wait, that'
 # OK, so there are 53 observations that I'm filtering out of the "works" rds that 
 # are still captured by my "filtered_refs_overlap" dataframe
 
+```
+
+```{r need to find the 53 citations from the overlapping references that aren't in the filtered works}
 
 test5_na <- test5 %>%
   filter(is.na(source_id))
@@ -223,7 +231,7 @@ test5_na <- test5 %>%
 
 getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
 
-# great, but I want it in the "data_outut" folder
+# great, but I want it in the "data_output" folder
 
 # setwd("~/data_output")  # Error in setwd("~/data_output") : cannot change working directory
 
@@ -236,14 +244,57 @@ full_output_path <- file.path(output_directory, file_name)
 
 # write_excel_csv(test5_na, "Refs_not_in_Works")  # , "/data_output")
 
-write_excel_csv(test5_na, file = full_output_path)
+# write_excel_csv(test5_na, file = full_output_path)
+
+
+##  ACTUALLY -- there's a faster way to do this...
+
+refs_not_in_works <- works %>%
+  filter(work_id %in% test5_na$work_id)
+
+write_excel_csv(refs_not_in_works, file = full_output_path)
+
+
 ```
 
 
+```{r subsetting the "refs" rds using %in% }
+
+refs_citing_only_2 <- refs %>% 
+  count(citing_id, sort = TRUE, name = "tally") %>% 
+  filter(tally >= 5) %>% 
+  select(-tally, from = citing_id)
+  
+refs_cited_only_2 <- refs %>% 
+  count(cited_id, sort = TRUE, name = "tally") %>% 
+  filter(tally >= 5) %>% 
+  select(-tally, to = cited_id)
 
 
-```{r Data Exploration - "works" - filter potential 2 }
+citing_in_cited <- refs_citing_only_2 %>% 
+  filter(from %in% refs_cited_only_2$to)
 
+cited_in_citing <- refs_cited_only_2 %>% 
+  filter(to %in% refs_citing_only_2$from)
+
+
+# now that I have isolated both the "citing_id" works and the "cited_id" works into their own dataframes, 
+# filtered them to just those works that appear 5 or more times
+# and have renamed them with the same column name
+# I should be able to intersect them
+
+filtered_refs_overlap <- intersect(refs_citing_only, refs_cited_only)
+
+typeof(filtered_refs_overlap) # [1] "list"
+class(filtered_refs_overlap)  # [1] "data.table" "data.frame"
+
+n_distinct(filtered_refs_overlap$citation)  # [1] 18977 - this matches the length of the dataframe!
+
+# um - I think it worked!  
+# given that the number of distinct values equals the number of observations
+# and given the below
+    # tally_filtered_refs_overlap <- count(filtered_refs_overlap, citation, sort = TRUE, name = "tally")
+    # min(tally_filtered_refs_overlap$tally)  # [1] 1
+    # max(tally_filtered_refs_overlap$tally)  # [1] 1
 
 ```
-
