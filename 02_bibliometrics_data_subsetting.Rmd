@@ -39,17 +39,19 @@ I can also limit the data to those articles that were NOT retracted.
 
 ```{r subsetting the "works" rds}
 
-# originally had this filtered to just "articles" but based on Wood et al. (2025), decided to also keep "reviews"2101?base
+# originally had this filtered to just "articles" but based on Wood et al. (2025), decided to also keep "reviews", "book" and "book-chapter" 
 
 filtered_works <- works %>% 
   filter(language == "en") %>% 
-  filter(type == "article" | type == "review") %>% 
+  filter(type == "article" | type == "review" | type == "book" | type == "book-chapter") %>% 
   filter(is_retracted == "FALSE") %>% 
-  select(-pmid, -mag, -primary_source_issn_l, -language, -type, -is_retracted, -is_paratext, -primary_source_type, -created_date, -updated_date)
+  select(-pmid, -mag, -publication_date, -language, -is_retracted, -is_paratext, -biblio_volume, -biblio_issue, -biblio_first_page, -biblio_last_page, -primary_source_type, -primary_source_issn_l, -created_date, -updated_date)
+
 
 #  want to test to make sure the filtering worked
+
 n_distinct(filtered_works$language)  # [1] 1  IT WORKED
-n_distinct(filtered_works$type)  # [1] 1  IT WORKED
+n_distinct(filtered_works$type)  # [1] 4  IT WORKED
 n_distinct(filtered_works$is_retracted)  # [1] 1  IT WORKED
 n_distinct(filtered_works$is_paratext)  # [1] 1  Didn't filter by this variable, but expected this result
 
@@ -58,27 +60,46 @@ n_distinct(filtered_works$is_paratext)  # [1] 1  Didn't filter by this variable,
     # could probably select out more, but want to look at more bibliometric analyses first
 
 # maybe I should filter out anything from 2026...?
-# print(count(filtered_works, publication_year == 2026))  	
+# print(count(filtered_works, publication_year == 2026))
     # publication_year == 2026      n
-    # 1                    FALSE 135832
+    # 1                    FALSE 137488
     # 2                     TRUE   1120  
     
-# so if I filter out those, the "filtered_works" should have 135,832 observations
+# so if I filter out those, the "filtered_works" should have 137,488 observations
 
 filtered_works <- filtered_works %>% 
   filter(publication_year != 2026) # 
 
-# str(filtered_works)  # 135832 obs. of  25 variables (means it worked)
+# can see from the data in the Global Environment that it worked
 
 # also want to filter out anything without a title
-# print(count(filtered_works, title == ""))
+print(count(filtered_works, title == ""))
     # title == ""      n
-    # 1       FALSE 135619
+    # 1       FALSE 137275
     # 2        TRUE    213
 
 
 filtered_works <- filtered_works %>% 
   filter(title != "") 
+
+# can see from the data in the Global Environment that it worked
+
+
+print(count(filtered_works, is.na(title)))  # 1:        FALSE 137275 -- as in, all of them, so no NA values
+
+print(count(filtered_works, is.na(fwci)))  # 2:        TRUE  10534
+print(count(filtered_works, is.na(primary_topic)))  # 2: TRUE   10529  
+print(count(filtered_works, is.na(primary_topic_subfield)))  # 2: TRUE   10529
+print(count(filtered_works, is.na(primary_topic_field)))  # 2: TRUE   10529
+print(count(filtered_works, is.na(primary_topic_domain)))  # 2: TRUE   10529
+
+#  after filtering out the NA values for "primary_topic" - all the "primary_topic_..." variables have no NA values
+# and "fwci" only has 5 values, so I'll filter those out below
+
+
+filtered_works <- filtered_works %>% 
+  filter(!is.na(primary_topic)) %>% 
+  filter(!is.na(fwci))
 
 # can see from the data in the Global Environment that it worked
 
@@ -132,8 +153,65 @@ n_distinct(filtered_refs_overlap$citation)  # [1] 18977 - this matches the lengt
 
  
 
-```{r Data Exploration - "works" - filter potential 1 }
+```{r Data Exploration - "filtered_works" - works with no references }
 
+print(min(filtered_works$referenced_works_count))
+print(count(filtered_works, referenced_works_count == 0))
+
+    # referenced_works_count == 0      n
+                            # <lgcl>  <int>
+    # 1:                       FALSE 101209
+    # 2:                        TRUE  25529  # this is without the "Boraspati" works included
+
+tally_no_refs_by_source_group <- filtered_works %>% 
+  filter(referenced_works_count == 0) %>% 
+  group_by(source_group) %>%  # group_by(source_id) -- gets the same tally as "by_journal" but now with source group, not journal name
+  count(source_group, sort = TRUE, name = "tally") %>% 
+  mutate(percent = tally/count_no_refs) %>% 
+  print()
+
+count_no_refs <- 25529
+
+tally_no_refs_by_journal <- filtered_works %>% 
+  filter(referenced_works_count == 0) %>% 
+  group_by(source_id) %>%  # group_by(source_id) 
+  count(primary_source_display_name, sort = TRUE, name = "tally") %>% 
+  print()
+
+# Wait, still have the "Boraspati" references
+
+filtered_works <- filtered_works %>% 
+  filter(primary_source_display_name != "Boraspati Journal Journal of Bilingualism Organization Research Articles Studies in Pedagogy Anthropology Theory and Indigenous Cultures")
+
+test <- filtered_works %>% 
+  filter(work_id %in% filtered_refs_overlap$citation)
+
+print(count(test, is.na(work_id)))  # 1:          FALSE 18924 -- so no NA values, and 53 fewer observations than the refs alone
+
+f_refs_overlap <- filtered_refs_overlap %>% 
+  select(work_id = citation)
+
+test2 <- inner_join(filtered_works, f_refs_overlap, by = "work_id")
+  # Error in 'inner_join()'
+  # `by` must be a (named) character vector, list, `join_by()` result, or NULL, not a function.
+      # added "" around [citation]
+        # Error in `inner_join()`:
+        # ! Join columns in `x` must be present in the data.
+
+
+  # typeof(filtered_refs_overlap$citation)
+
+test3 <- left_join(filtered_works, f_refs_overlap, by = "work_id")
+print(count(test3, is.na(work_id)))  # 1:          FALSE 126737 -- should have returned (126737-18977 = 107760) NA values...?
+
+test4 <- right_join(filtered_works, f_refs_overlap, by = "work_id")
+print(count(test4, is.na(work_id)))  # 1:          FALSE 18977 -- good, would have been off if there were any NA values
+
+test5 <- full_join(filtered_works, f_refs_overlap, by = "work_id")
+print(count(test5, is.na(work_id)))  # 1:          FALSE 126790  --  wait, that's more than in "filtered_works" - by 53
+
+# OK, so there are 53 observations that I'm filtering out of the "works" rds that 
+# are still captured by my "filtered_refs_overlap" dataframe
 
 ```
 
