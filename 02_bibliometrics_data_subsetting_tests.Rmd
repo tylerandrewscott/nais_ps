@@ -103,8 +103,6 @@ filtered_works <- filtered_works %>%
 
 # can see from the data in the Global Environment that it worked
 
-
-
 ```
 
 
@@ -181,7 +179,86 @@ tally_no_refs_by_journal <- filtered_works %>%
 filtered_works <- filtered_works %>% 
   filter(primary_source_display_name != "Boraspati Journal Journal of Bilingualism Organization Research Articles Studies in Pedagogy Anthropology Theory and Indigenous Cultures")
 
+
+summary(lengths(res$referenced_works))
+summary(lengths(filtered_works$referenced_works_count))
+tally_ref_counts <- filtered_works %>% 
+  count(referenced_works_count, sort = FALSE, name = "tally")
+
+length(res$referenced_works[which(lengths(res$referenced_works) < 10)])
+length(filtered_works$referenced_works_count[filtered_works$referenced_works_count < 10])  # 40687
+length(filtered_works$referenced_works_count[filtered_works$referenced_works_count >= 10])  # 86050
+
+no_refs_in_works <- filtered_works %>% 
+  filter(referenced_works_count == 0)
+
+str(no_refs_in_works)  # Classes ‘data.table’ and 'data.frame':	25529 obs. of  21 variables
+
+no_refs_overlap <- no_refs_in_works %>% 
+  filter(work_id %in% f_refs_overlap$work_id)
+
+str(no_refs_overlap)  # Classes ‘data.table’ and 'data.frame':	0 obs. of  21 variables
+
+no_refs_overlap_2 <- no_refs_in_works %>% 
+  filter(work_id %in% refs$cited_id)
+
+str(no_refs_overlap_2)  # Classes ‘data.table’ and 'data.frame':	0 obs. of  21 variables
+
+no_refs_in_works_open <- filtered_works %>% 
+  filter(referenced_works_count == 0) %>% 
+  filter(oa_status != "closed")
+
+str(no_refs_in_works_open)  # Classes ‘data.table’ and 'data.frame':	2344 obs. of  21 variables
+length(no_refs_in_works_open$has_fulltext[no_refs_in_works_open$has_fulltext == "TRUE"])  # 711 - these have full text
+length(no_refs_in_works_open$oa_is_oa[no_refs_in_works_open$oa_is_oa == "TRUE"]) # [1] 2344 - wait, so all of these are OA?
+n_distinct(no_refs_in_works_open$oa_is_oa)  # [1] 1 - yep, apparently they are all OA
+
+
+# OK, so seems like none of the references with zero values for the "referenced_works_count" show up in the "refs" rds
+# even if their OA status is NOT closed
+
+one_refs_in_works <- filtered_works %>% 
+  filter(referenced_works_count == 1)
+
+str(one_refs_in_works)  # Classes ‘data.table’ and 'data.frame':	2358 obs. of  21 variables
+
+one_refs_overlap <- one_refs_in_works %>% 
+  filter(work_id %in% refs$cited_id)
+
+str(one_refs_overlap)  # Classes ‘data.table’ and 'data.frame':	1005 obs. of  21 variables
+
+# BUT, as soon as there is a single referenced work, then there is overlap
+
 ```
+
+```{r investigating the "primary topic" variables of the filtered works}
+
+tally_primary_topic_field_filtered <- count(filtered_works, primary_topic_field, sort = TRUE, name = "tally")
+str(tally_primary_topic_field_filtered)  # Classes ‘data.table’ and 'data.frame':	26 obs. of  2 variables
+
+n_distinct(filtered_works$primary_topic)  # [1] 2481
+n_distinct(filtered_works$primary_topic_domain)  # [1] 4
+n_distinct(filtered_works$primary_topic_field)  # [1] 26
+n_distinct(filtered_works$primary_topic_subfield)  # [1] 217
+
+n_distinct(filtered_works$primary_topic_subfield[filtered_works$primary_topic_field == "Social Sciences"])  # [1] 22 (Wait, really?!?)
+n_distinct(filtered_works$primary_topic[filtered_works$primary_topic_field == "Social Sciences"])  # [1] 583
+
+tally_by_primary_field <- filtered_works %>% 
+  group_by(primary_topic_field) %>%
+  mutate(n_subfields = n_distinct(primary_topic_subfield)) %>% 
+  mutate(n_topics = n_distinct(primary_topic)) %>% 
+  select(primary_topic_field, n_subfields, n_topics) %>% 
+  distinct(primary_topic_field, .keep_all = TRUE)
+  
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_fields <- "Subfields_Topics.csv"
+full_output_path_fields <- file.path(output_directory, file_name_fields)
+
+write_excel_csv(tally_by_primary_field, file = full_output_path_fields)
+
+```
+
 
 
 ```{r subsetting the filtered works to match the overlapping refs}
