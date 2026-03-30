@@ -1,7 +1,7 @@
 ---
 title: " 02_bibliometrics_data_subsetting"
 author: "Mackenzie Johnson"
-date: "20260307_11"
+date: "20260320"
 output: html_document
 ---
   
@@ -15,6 +15,19 @@ library(ggplot2)
 library(knitr)
 library(tidyverse)
 ```
+
+
+```{r code for writing csvs}
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_fields <- "Subfields_Topics.csv"
+full_output_path_fields <- file.path(output_directory, file_name_fields)
+
+write_excel_csv(df, file = full_output_path_fields)
+
+```
+
+
 
 ```{r SetWD}
 
@@ -44,17 +57,22 @@ Lastly, I want to remove any rows that have NA as the value for either fwic or p
 
 In summary, my plan is to filter by language, type, is.retracted, pre-2026, blank titles, "Boraspati", and NA values in fwic and primary_topic.  
 
-Once I check that those were successful (especially language, type, and is.retracted), I can select out several columns.  
+Once I check that those were successful (especially language, type, and is.retracted), I can select out several columns.  (In Liza's code, she only used work_id, publication year, language, type, and referenced_works_count.)  
 
 
 ```{r subsetting the "works" rds}
 
-# originally had this filtered to just "articles" but based on Wood et al. (2025), decided to also keep "reviews", "book" and "book-chapter" 
+# originally had this filtered to just "article" but based on Wood et al. (2025), decided to also keep "review", "book" and "book-chapter" 
 
 filt_works <- works %>% 
   filter(language == "en") %>% 
   filter(type == "article" | type == "review" | type == "book" | type == "book-chapter") %>% 
   filter(is_retracted == "FALSE") %>% 
+  filter(publication_year != 2026) %>% 
+  filter(title != "") %>% 
+  filter(!is.na(primary_topic)) %>% 
+  filter(!is.na(fwci)) %>% 
+  filter(primary_source_display_name != "Boraspati Journal Journal of Bilingualism Organization Research Articles Studies in Pedagogy Anthropology Theory and Indigenous Cultures") %>% 
   select(-pmid, -mag, -publication_date, -language, -is_retracted, -is_paratext, -biblio_volume, -biblio_issue, -biblio_first_page, -biblio_last_page, -primary_source_type, -primary_source_issn_l, -created_date, -updated_date)
 
 
@@ -66,7 +84,7 @@ n_distinct(filt_works$is_retracted)  # [1] 1  IT WORKED
 n_distinct(filt_works$is_paratext)  # [1] 1  Didn't filter by this variable, but expected this result
 
 # now I can go back and select out more columns
-# end result for now is 25 variables
+# end result for now is 21 variables
     # could probably select out more, but want to look at more bibliometric analyses first
 
 # maybe I should filter out anything from 2026...?
@@ -178,9 +196,9 @@ tally_no_refs_by_source_group <- filtered_works %>%
 count_no_refs <- 25529
 # count_no_refs <- count(filtered_works, referenced_works_count == 0)  # returns a 2 x 2 table
 
-tally_no_refs_by_journal <- filtered_works %>% 
+tally_no_refs_by_journal <- filt_works %>% 
   filter(referenced_works_count == 0) %>% 
-  group_by(source_id) %>%  # group_by(source_id) 
+  group_by(source_id) %>% 
   count(primary_source_display_name, sort = TRUE, name = "tally") %>% 
   print()
 
@@ -243,8 +261,8 @@ str(one_refs_overlap)  # Classes ‘data.table’ and 'data.frame':	1005 obs. of
 
 ```{r investigating the "primary topic" variables of the filtered works}
 
-tally_primary_topic_field_filtered <- count(filtered_works, primary_topic_field, sort = TRUE, name = "tally")
-str(tally_primary_topic_field_filtered)  # Classes ‘data.table’ and 'data.frame':	26 obs. of  2 variables
+# tally_primary_topic_field_filtered <- count(filt_works, primary_topic_field, sort = TRUE, name = "tally")
+# str(tally_primary_topic_field_filtered)  # Classes ‘data.table’ and 'data.frame':	26 obs. of  2 variables
 
 n_distinct(filtered_works$primary_topic)  # [1] 2481
 n_distinct(filtered_works$primary_topic_domain)  # [1] 4
@@ -254,7 +272,7 @@ n_distinct(filtered_works$primary_topic_subfield)  # [1] 217
 n_distinct(filtered_works$primary_topic_subfield[filtered_works$primary_topic_field == "Social Sciences"])  # [1] 22 (Wait, really?!?)
 n_distinct(filtered_works$primary_topic[filtered_works$primary_topic_field == "Social Sciences"])  # [1] 583
 
-tally_by_primary_field <- filtered_works %>% 
+tally_by_primary_field <- filt_works %>% 
   group_by(primary_topic_field) %>%
   mutate(n_subfields = n_distinct(primary_topic_subfield)) %>% 
   mutate(n_topics = n_distinct(primary_topic)) %>% 
@@ -266,6 +284,68 @@ file_name_fields <- "Subfields_Topics.csv"
 full_output_path_fields <- file.path(output_directory, file_name_fields)
 
 write_excel_csv(tally_by_primary_field, file = full_output_path_fields)
+
+prim_field_biochem <- filt_works %>% 
+  filter(primary_topic_field == "Biochemistry, Genetics and Molecular Biology")
+
+prim_field_socsci <- filt_works %>% 
+  filter(primary_topic_field == "Social Sciences")
+
+prim_field_envsci <- filt_works %>% 
+  filter(primary_topic_field == "Environmental Science")
+
+prim_field_econ <- filt_works %>% 
+  filter(primary_topic_field == "Economics, Econometrics and Finance")
+
+prim_field_agbio <- filt_works %>% 
+  filter(primary_topic_field == "Agricultural and Biological Sciences")
+
+
+tally_biochem <- prim_field_biochem %>% 
+  count(source_group, sort = TRUE, name = "tally") %>% 
+  mutate(pct = tally / nrow(prim_field_biochem))
+
+biochem_topics <- prim_field_biochem %>% 
+  group_by(primary_topic_subfield) %>% 
+  count(primary_topic, sort = TRUE, name = "n_topics") %>% 
+  mutate(n_subfields = count(primary_topic_subfield, ))
+
+
+
+```
+
+
+
+```{r Elise's help}
+
+# Elise reminded me of a simpler way to get the counts - use "table"
+
+  # but to write the table to csv, need to make it a dataframe
+  # as.data.frame(table(prim_field_biochem$primary_topic_subfield))
+
+# just need to write them to a csv
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "AgBio_subfields.csv"
+full_output_path_fields <- file.path(output_directory, file_name)
+
+write_excel_csv(as.data.frame(table(prim_field_agbio$primary_topic_subfield)), file = full_output_path_fields)
+
+table(filt_works$primary_topic)
+table(prim_field_biochem$primary_topic)
+table(prim_field_biochem$primary_topic_subfield)
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_fields <- "Subfields_Topics.csv"
+full_output_path_fields <- file.path(output_directory, file_name_fields)
+
+write_excel_csv(df, file = full_output_path_fields)
+
+```
+
+```{r Elise's help} 
+
+table(filt_works$)
 
 ```
 
@@ -344,8 +424,7 @@ write_excel_csv(refs_not_in_works, file = full_output_path)
 
 # OK, found them!  
 # in the spreadsheet, I highlighted why each would have been filtered out
-# so, 
-
+# so, should definitely use either the %in% or one of the joins that does NOT keep the "refs" that aren't in the "works"
 
 ```
 

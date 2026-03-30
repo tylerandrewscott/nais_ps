@@ -1,0 +1,206 @@
+---
+title: " 02_bibliometrics_data_subsetting"
+author: "Mackenzie Johnson"
+date: "20260307_11"
+output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+library(ggplot2)
+library(knitr)
+library(tidyverse)
+```
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData1}
+
+works <- readRDS(file = "data/works.rds")
+refs <- readRDS(file = "data/refs.rds")
+
+```
+
+Looking over Wood et al. (2025) (Liza, Francesca, Tyler - bibliometric analysis of "environmental governance processes"), it's obviously acceptable for me to limit the analysis to just English-language works.  But even before I get to that, I want to subset out the data by type.  Recall, there are 12 types of works included.  When I first looked at the ones marked "books" for [type], I noticed that all the ones from American Indian Quarterly are book * reviews * , not books (!) - and the first non-AIQ entry * is* a book, but it's assigned a DOI that actually matches another article in the list of works.  
+
+(Maybe I should be using the [primary_source_type] instead - NOT!  All 146k+ are listed as "journal" for that variable.)
+
+I can also limit the data to those articles that were NOT retracted
+
+
+```{r subsetting the "works" rds}
+
+filtered_works <- works %>% 
+  filter(language == "en") %>% 
+  filter(type == "article") %>% 
+  filter(is_retracted == "FALSE") %>% 
+  select(-pmid, -mag, -primary_source_issn_l, -language, -type, -is_retracted, -is_paratext, -primary_source_type, -created_date, -updated_date)
+
+#  want to test to make sure the filtering worked
+n_distinct(filtered_works$language)  # [1] 1  IT WORKED
+n_distinct(filtered_works$type)  # [1] 1  IT WORKED
+n_distinct(filtered_works$is_retracted)  # [1] 1  IT WORKED
+n_distinct(filtered_works$is_paratext)  # [1] 1  Didn't filter by this variable, but expected this result
+
+# now I can go back and select out more columns
+# end result for now is 25 variables
+    # could probably select out more, but want to look at more bibliometric analyses first
+
+```
+
+
+Now want to try working with the "refs.rds" file.  1) I want to figure out how to get just the articles that appear in both columns.  Looked online: will try INTERSECT function first.  2) I want to somehow filter it by just those articles that were cited at least 5 times (per Wood et al. 2025).  
+
+
+```{r subsetting the "refs" rds, part 1}
+
+# First, try getting a dataframe of just those articles that appear in both columns (citing and cited)
+
+refs_overlap <- refs %>% 
+  intersect(citing_id, cited_id)
+
+  # Error in `intersect()`:
+  # ! `...` must be empty.
+  # ✖ Problematic argument:
+  # • ..1 = cited_id
+  # ℹ Did you forget to name an argument?
+  # Run `rlang::last_trace()` to see where the error occurred.
+
+
+
+# OK, let's just use some code from one of the help sites to make sure it works
+
+# vec1 <- c(1, 3, 5, 7, 9)
+# vec2 <- c(2, 4, 6, 8, 5, 10)
+
+# common_elements <- intersect(vec1, vec2)
+# common_elements
+
+# typeof(vec1)  # 1] "double"
+# class(vec1)  # [1] "numeric"
+
+# Good, so that worked...
+
+refs_citing <- refs %>% 
+  select(-cited_id)
+
+refs_cited <- refs %>% 
+  select(-citing_id)
+
+typeof(refs_cited)  # [1] "list"
+class(refs_cited)  # [1] "data.table" "data.frame"
+
+refs_overlap
+<- intersect(refs_citing, refs_cited)
+
+  # Error in `intersect()`:
+  # ! `x` and `y` are not compatible.
+  # ✖ Cols in `y` but not `x`: `cited_id`.
+  # ✖ Cols in `x` but not `y`: `citing_id`.
+  # Run `rlang::last_trace()` to see where the error occurred.
+
+# ?intersect
+  # column names have to be the same!!
+
+# refs_citing_renamed <- refs_citing %>% 
+  # rename(citing_id = citation)
+
+  # Error in `rename()`:
+  # ! Can't rename columns that don't exist.
+  # ✖ Column `citation` doesn't exist.
+  # Run `rlang::last_trace()` to see where the error occurred.
+
+
+refs_citing <- refs %>% 
+  select(-cited_id, citation = citing_id)
+
+refs_cited <- refs %>% 
+  select(-citing_id, citation = cited_id)
+
+refs_overlap <- intersect(refs_citing, refs_cited)
+typeof(refs_overlap) # [1] "list"
+class(refs_overlap)  # [1] "data.table" "data.frame"
+
+n_distinct(refs_overlap$citation)  # [1] 60584 - this matches the number of observations for the variable
+
+# um...that's surprising
+# need to back up - it worked as expected, giving me a df with one row for each of the ids found in both the citing and cited
+  # n_distinct:  results match number of observations for the df
+  # also, see below
+
+# tally_refs_overlap <- count(refs_overlap, citation, sort = TRUE, name = "tally")
+# min(tally_refs_overlap$tally)  # [1] 1
+# max(tally_refs_overlap$tally)  # [1] 1
+
+refs_citing_grouped <- refs_citing %>% 
+  group_by(citation)
+
+length(refs_citing_grouped$citation)  # [1] 602219
+
+# ok, so none of the citing_ids are repeated?
+# that can't possibly be right:
+
+n_distinct(refs_citing_grouped$citation)  # [1] 79643
+
+refs_cited_grouped <- refs_cited %>% 
+  group_by(citation)
+
+length(refs_cited_grouped$citation)  # # [1] 602219
+
+
+# and none of the cited IDs are repeated ??
+# that can't possibly be right!  
+
+n_distinct(refs_cited_grouped$citation)  # [1] 73405
+
+refs_overlap_name <- refs %>% 
+  citing_id[citing_id %in% cited_id]
+
+refs_grouped <- refs %>% 
+  group_by(cited_id)
+
+refs_cited_vector <- as.vector(refs_cited)
+refs_citing_vector <- as.vector(refs_citing)
+
+refs_overlap2 <- intersect(refs_citing_vector, refs_cited_vector)
+str(refs_overlap2)  # list()
+
+tally_refs_citing <- refs_citing(refs_overlap, citation, sort = TRUE, name = "tally")
+
+```
+
+
+
+
+
+```{r Data Exploration - "works" - publication dates }
+
+
+```
+
+
+
+ 
+
+```{r Data Exploration - "works" - filter potential 1 }
+
+
+```
+
+
+
+
+```{r Data Exploration - "works" - filter potential 2 }
+
+
+```
+
