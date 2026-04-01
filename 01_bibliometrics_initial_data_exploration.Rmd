@@ -239,6 +239,22 @@ tally_type <- count(works, type, sort = TRUE, name = "tally")
 n_distinct(works$language)  # [1] 32
 tally_lang <- count(works, language, sort = TRUE, name = "tally")
 
+n_distinct(works$language)  # [1] 31
+tally_lang <- count(works, language, sort = TRUE, name = "tally")  # english-language: n = 149,776
+length(works$language[works$language == "en" & !is.na(works$language)])  # [1] 150498
+
+
+# at first it added in the NA values (n = 722) to the count 
+# BE CAREFUL with NA VALUES IN BASE R!
+# when I tried "& ... != "NA" - it still didn't work right
+# Sara helped with dealing with the NA values
+
+# BUT!  Tidyverse takes care of it for you!  
+
+tally_lang2 <- works %>% 
+  group_by(language) %>% 
+  summarise(n = n()) %>% 
+  arrange(desc(n))
 
 # n_distinct(works$is_retracted)  # [1] 3
 # print(count(works, is_retracted, sort = TRUE, name = "tally"))

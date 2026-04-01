@@ -51,13 +51,13 @@ Liza et al. originally used articles, reviews, books, and book chapters.  I beli
 
 I can also limit the data to those articles that were NOT retracted.  
 
-Working through the dataset, I also want to limit the works to anything published before 2026.  I also want to remove any references with blanks for the title, and I want to remove any works from the "Boraspati" journal - this is what OpenAlex thinks we mean by "Journal of Indigenous Research" but is actually minor journal from Indonesia, with a lot of articles in Indonesian. 
+Working through the dataset, I also want to limit the works to anything published before 2026.  I also want to remove any references with blanks for the title. 
 
 Lastly, I want to remove any rows that have NA as the value for either fwic or primary_topic.
 
-In summary, my plan is to filter by language, type, is.retracted, pre-2026, blank titles, "Boraspati", and NA values in fwic and primary_topic.  
+In summary, my plan is to filter by language, type, is.retracted, pre-2026, blank titles, and NA values in fwic and primary_topic.  
 
-Once I check that those were successful (especially language, type, and is.retracted), I can select out several columns.  (In Liza's code, she only used work_id, publication year, language, type, and referenced_works_count.)  
+Once I check that those were successful, I can select out several columns (specifically, language, is.retracted, and is.paratext).  (In Liza's code, she only used work_id, publication year, language, type, and referenced_works_count.)  
 
 
 ```{r subsetting the "works" rds}

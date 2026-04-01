@@ -1,0 +1,503 @@
+---
+title: " 01_bibliometrics_data_exploration"
+author: "Mackenzie Johnson"
+date: "2026-03-30"
+# output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+library(ggplot2)
+library(knitr)
+library(tidyverse)
+```
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData1}
+
+works <- readRDS(file = "data/works.rds")
+refs <- readRDS(file = "data/refs.rds")
+
+```
+
+
+Now that I have the 2 RDS files Tyler created, I need to explore the data.  
+1) Based on the below, it seems like there are 4,564 articles that represent cross-over:  they were both an original article and an article that was cited by one of the other original articles.  [Will eventually need to subset those articles, but want to explore "works" some more first.]
+
+EDIT:  based on code in "02" code, that assumption about the number of overlapping articles is incorrect.  
+
+
+```{r Data Exploration - mostly "refs" }
+
+str(refs)
+# Classes ‘data.table’ and 'data.frame':	634527 obs. of  2 variables
+# "$ citing_id" and "$ cited_id"
+
+n_distinct(refs$citing_id)  # [1] 81553
+n_distinct(refs$cited_id)  # [1] 75245
+
+n_distinct(works)  # [1] 152234
+
+sum(n_distinct(refs$citing_id), n_distinct(refs$cited_id))  # [1] 156798
+
+# that's more than the total of "works" 
+
+sum(n_distinct(refs$citing_id), n_distinct(refs$cited_id), -n_distinct(works))  # [1] 4564
+
+```
+
+
+2) Journal sources  
+
+A quick comparison of the 3 source files against the list of unique journals found in either the "source_id" or "primary_source_display_name" variables indicates that two journals included in the query did not yield any results.  Previous sleuthing revealed that the "Journal of Indigenous Research" coded to a minor Indonesian journal ("Boraspati..." - removed from the current query) and that the journal "Native Studies Review" coded to "Wicazo Sa Review" despite them being separate journals.  Previous investigation also indicated that "Public Administration" was not originally included in the query; the current query is a re-run of the initial search, but with "Public Administration" included.  
+
+
+Don't want to print the full journal tally here, but the simpler source_group tally is also interesting.  
+
+      source_group  tally
+    1           ep 72498
+    2           ps 53409
+    3         nais 26327
+
+
+Note that all of the articles in "Decolonization" are missing both DOI and ISSN numbers; similarly, most of the articles of "The Journal of American Indian Education" (395/411) are also missing DOIs and all are missing ISSN numbers.  
+
+A fuller accounting of the works with no DOI numbers shows that 2161 of the articles don't:  they are coming from all 3 source groups, though more are from the NAIS journals
+
+  source_group tally       pct
+1         nais  1368    0.6330403
+2           ep   502    0.2322999
+3           ps   291    0.1346599
+
+```{r Data Exploration - sources }
+
+head(works)  # doesn't work, but doesn't give any error or warning either
+str(works)  # Classes ‘data.table’ and 'data.frame':	152234 obs. of  35 variables
+typeof(works)  # [1] "list"
+class(works)  # [1] "data.table" "data.frame"
+
+# names(works)
+# n_distinct(works$source_id) # [1] 63
+
+# source_id_count <- count(works, source_id, sort = TRUE, name = "tally")
+# view(source_id_count)
+  # kindof useless without having to cross-reference to journal name
+
+n_distinct(works$primary_source_display_name)  # [1] 63
+tally_journal <- count(works, primary_source_display_name, sort = TRUE, name = "tally")
+
+journal_SID <- works %>% 
+   group_by(primary_source_display_name) %>% 
+   select(source_id, primary_source_display_name) %>% 
+   unique()
+
+
+# tally2_journal <- count(works, primary_source_display_name, sort = FALSE, name = "tally") 
+# this is if you want the list ordered alphabetically ("sort = FALSE")
+
+n_distinct(works$source_group)  # [1] 3
+tally_source_group <- count(works, source_group, sort = TRUE, name = "tally")
+print(tally_source_group)
+
+
+n_distinct(works$primary_source_issn_l)  # [1] 62 ... um...I was expecting 63 ...
+
+journal_no_issn <- works %>% 
+  filter(is.na(primary_source_issn_l))
+
+tally_journal_no_issn <- count(journal_no_issn, primary_source_display_name, sort = TRUE, name = "tally")
+print(tally_journal_no_issn)  # Classes ‘data.table’ and 'data.frame':	2 obs. of  2 variables
+
+na_doi <- works %>% filter(is.na(doi))
+nrow(na_doi)  # [1] 2161
+n_distinct(na_doi$source_group)  # [1] 3
+
+tally_na_doi_source_group <- na_doi %>% 
+  count(source_group, sort = TRUE, name = "tally") %>% 
+  mutate(pct = tally / nrow(na_doi))
+
+print(tally_na_doi_source_group)
+
+tally_na_doi_journal <- count(na_doi, primary_source_display_name, sort = TRUE, name = "tally")
+
+```
+
+
+3) Temporal range
+
+The fact that 2 of the publication dates are entered as "1800" is curious.  Should remove the works from 2026 so there is a clean cut-off.  Looking at temporal variation later will be important.  
+
+
+
+```{r Data Exploration - "works" - publication dates }
+
+min(works$publication_year)  # [1] 1800
+max(works$publication_year) # [1] 2026
+
+# p <- ggplot(data = works, aes(x = publication_year)) + 
+#  geom_histogram()
+
+# p  ->  created a huge histogram, that wasn't really that informative - copied into a note to myself in Slack
+```
+
+
+4) Filter potential:  "type"   [EDIT:  limit to articles and reviews; see below for investigation of whether or not to include books and book-chapters]
+
+Looking at the type of works that are included, I am surprised by the variety - definitely could filter out some of these.
+ 
+                        type  tally
+    1                  article 144147
+    2                 paratext   4577
+    3                   review   1325
+    4                editorial    902
+    5                  erratum    478
+    6                 preprint    354
+    7             book-chapter    318
+    8                   letter     70
+    9                     book     42
+    10                   other     17
+    11                 dataset      3
+    12 supplementary-materials      1
+ 
+
+```{r Data Exploration - "works" - filter potential 1 - type}
+
+n_distinct(works$type)  # [1] 12
+tally_type <- works %>% 
+ group_by(type) %>% 
+  summarise(n = n()) %>% 
+  arrange(desc(n))
+
+
+
+# print(tally_type)
+
+# length(unique(works$type))  # [1] 12
+# (This is another way to get the same information - it's how how Liza did it)
+
+n_distinct(works$primary_source_type)  
+  # [1] 1 - which means they're all "journal" ... 
+  # so I can easily SELECT out this variable ...
+  # and it also means if I'm going to subset based on type of work, it has to be done using the [type] variable
+
+```
+
+If I look in more detail at the low-n works:
+ a) Datasets:  only 3, not sure how they were included in the query, all 3 are related to energy policy
+ b) Books and Book-chapters:  
+
+  - Most are not going to be included in the "refs" network (3 + 3 + 20 = 26)
+     oa_status     n
+  <chr>     <int>
+1 bronze        3
+2 closed      334
+3 green         3
+4 hybrid       20
+
+   - Most are labeled as "book chapters"
+   
+  type             n
+  <chr>        <int>
+1 book            42
+2 book-chapter   318
+
+   - ~96% are accounted for in only 8 sources
+
+ primary_source_display_name                         n     pct
+   <chr>                                           <int>   <dbl>
+ 1 Energy Economics                                  136 0.378  
+ 2 Energy Efficiency                                  75 0.208  
+ 3 Climate and Development                            50 0.139  
+ 4 Climate Policy                                     28 0.0778 
+ 5 Marine Policy                                      22 0.0611 
+ 6 The American Indian Quarterly                      22 0.0611 
+ 7 Energy Policy                                       8 0.0222 
+ 8 Public Administration                               4 0.0111 
+ 
+ 
+ c) Reviews
+ 
+   - A majority are from the EP sources
+   
+    source_group     n   pct
+  <chr>        <int> <dbl>
+1 ep             826 0.623
+2 ps             266 0.201
+3 nais           233 0.176
+
+
+ - Over half will not be in the "refs" network
+ 
+ oa_status     n    pct
+  <chr>     <int>  <dbl>
+1 closed      788 0.595 
+2 hybrid      241 0.182 
+3 green       105 0.0792
+4 bronze       80 0.0604
+5 gold         77 0.0581
+6 diamond      34 0.0257
+
+
+ 
+ primary_source_display_name                                n    pct
+   <chr>                                                  <int>  <dbl>
+ 1 Energy Research & Social Science                         157 0.118 
+ 2 Energy Policy                                            102 0.0770
+ 3 Environmental Impact Assessment Review                    92 0.0694
+ 4 EcoHealth                                                 81 0.0611
+ 5 Energy Strategy Reviews                                   74 0.0558
+ 6 Marine Policy                                             74 0.0558
+ 7 Journal of Environmental Planning and Management          42 0.0317
+ 8 Current Opinion in Environmental Sustainability           40 0.0302
+ 9 Energy & Environment                                      38 0.0287
+10 Climate and Development                                   36 0.0272
+11 Climate Policy                                            32 0.0242
+12 International Journal of Public Administration            30 0.0226
+13 The Electricity Journal                                   29 0.0219
+14 Public Administration Review                              27 0.0204
+15 Mitigation and Adaptation Strategies for Global Change    25 0.0189
+
+
+
+```{r Data Exploration - "works" - detailed look at the low-n "types"}
+
+works_books_chapters <- works %>% 
+   filter(type == "book" | type == "book-chapter") %>% 
+  # group_by(primary_source_display_name) %>% 
+  # summarise(n = n()) %>%
+  # arrange(desc(n)) %>% 
+  # mutate(pct = n/sum(n)) %>% 
+  # print()
+
+works_datasets <- works %>% 
+   filter(type == "dataset") # %>%   select(work_id, type, title, doi)
+
+works_errata <- works %>% 
+  filter(type == "erratum") # %>%   select(work_id, type, title, doi)
+
+works_reviews <- works %>% 
+   filter(type == "review") %>%  # n = 1325
+  group_by(oa_status) %>% 
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>% 
+  mutate(pct = n/sum(n)) %>% 
+  print()
+
+
+```
+
+
+5) Filter potential:  Language  [EDIT: limit to language == "en"]
+
+Looking at the languages: 144,111 of the 146,591 are in English - and there are 32 unique values for language (though one of them is "NA" ...?)  (for full breakdown, see "tally_lang")
+
+
+
+```{r Data Exploration - "works" - filter potential 2 -lang}
+
+n_distinct(works$language)  # [1] 31
+tally_lang <- count(works, language, sort = TRUE, name = "tally")  # english-language: n = 149,776
+
+```
+
+6) Filter potential:  Miscellaneous
+
+a) Could also filter out those articles that were retracted - but what to do about the "NA" values?
+  
+      is_retracted  tally
+    1        FALSE 150489
+    2           NA   1691
+    3         TRUE     54
+  
+
+b) What to do with the small number of paratext sources?  (From U Michigan:  "The paratext is everything in a book or manuscript that’s not the author’s words: illustrations, footnotes, font and layout, quality of materials, the size or shape of the pages.")
+  
+      is_paratext  tally
+    1       FALSE 150485
+    2        TRUE   1749
+  
+
+c) What to do with the fact that only a small fraction of the works have the full text?  Should it matter if I have the DOI and/or the title of the work?  
+  
+      has_fulltext  tally
+    1        FALSE 143203
+    2         TRUE   9031
+     
+
+d)  Regarding "open access" status:  as expected, the number of "FALSE" values (n = 118,469) for "oa_is_oa" variable to match the number of "closed" values for the "oa_status" variable.  I do think open-access status will be important to track because of the marginalizing effect of paywalls.  (I included a discussion of this in my original paper from a few years ago.)
+
+
+```{r Data Exploration - "works" - filter potential 3 - misc}
+
+n_distinct(works$is_retracted)  # [1] 3
+print(count(works, is_retracted, sort = TRUE, name = "tally"))
+
+    # is_retracted  tally
+            # <lgcl>  <int>
+    # 1:        FALSE 150489
+    # 2:           NA   1691
+    # 3:         TRUE     54
+
+
+print(count(works, is_paratext, sort = TRUE, name = "tally"))
+
+print(count(works, has_fulltext, sort = TRUE, name = "tally"))
+
+print(count(works, oa_is_oa, sort = TRUE, name = "tally"))
+
+    # oa_is_oa  tally
+        # <lgcl>  <int>
+    # 1:    FALSE 118469
+    # 2:     TRUE  33765
+
+print(count(works, oa_status, sort = TRUE, name = "tally"))
+
+    # oa_status  tally
+    #       <char>  <int>
+    # 1:    closed 118469
+    # 2:    hybrid  11994
+    # 3:    bronze   8779
+    # 4:     green   7064
+    # 5:      gold   2993
+    # 6:   diamond   2935
+
+
+
+```
+
+
+7)  Filter potential: primary topic/field
+
+  a)  primary topic will probably not be particularly useful (n = 2,562), though it might be good to consider those topics that account for a certain percentage of the works
+
+  b)  similar problem / strategy for the subfield (n = 223)
+
+  c)  opposite problem for the primary topic domain (n = 5, and one of those is "NA")
+            
+            primary_topic_domain tally
+        1      Social Sciences 86393
+        2    Physical Sciences 41842
+        3                 <NA> 16640
+        4      Health Sciences  4417
+        5        Life Sciences  2942
+    
+  d) maybe the best option will be to consider the primary topic field (n = 27)
+        
+
+
+```{r Data Exploration - "works" - filter potential 4 - primary topic}
+
+n_distinct(works$primary_topic)  # [1] 2562
+n_distinct(works$primary_topic_domain)  # [1] 5
+n_distinct(works$primary_topic_field)  # [1] 27
+n_distinct(works$primary_topic_subfield)  # [1] 223
+
+print(count(works, primary_topic_domain, sort = TRUE, name = "tally"))
+tally_primary_topic_field <- count(works, primary_topic_field, sort = TRUE, name = "tally")
+
+```
+
+
+8) NA values to filter out
+
+Here are the categories with "NA" values: "title" (which also has blank values), "language" (which I already plan to filter, keeping just "en" entries), "fwci", "is_retracted", and all 4 "primary_topic" variables.  
+
+
+``` {r Data Exploration - "works" - removing NAs}
+
+{r Data exporation - "works" - NA values}
+
+# Even the "title" variable has blanks
+
+print(count(works, title == ""))
+    #           <lgcl>  <int>
+    # 1:       FALSE 150019
+    # 2:        TRUE    524
+    # 3:          NA   1691
+
+# below are all the tests for how many "NA" values each variable has
+
+print(count(works, is.na(title)))  # 2: TRUE   1691
+
+print(count(works, is.na(publication_year)))  # 1: FALSE 152234 -- as in, all of them, so no NA values
+print(count(works, is.na(publication_date)))  # 1: FALSE 152234 -- as in, all of them, so no NA values
+print(count(works, is.na(type)))  # 1: FALSE 152234 -- as in, all of them, so no NA values
+
+print(count(works, is.na(language)))  # 2: TRUE   722
+
+print(count(works, is.na(cited_by_count)))   # 1: FALSE 152234 -- as in, all of them, so no NA values
+print(count(works, is.na(referenced_works_count)))  # 1: FALSE 152234 -- as in, all of them, so no NA values
+print(count(works, is.na(locations_count)))  # 1: FALSE 152234 -- as in, all of them, so no NA values
+print(count(works, is.na(countries_distinct_count)))  # 1: FALSE 152234 -- as in, all of them, so no NA values
+print(count(works, is.na(institutions_distinct_count)))  # 1: FALSE 152234 -- as in, all of them, so no NA values
+
+print(count(works, is.na(fwci)))  # 2: TRUE   16713
+print(count(works, is.na(is_retracted)))  # 2: TRUE   1691
+
+print(count(works, is.na(is_paratext)))  # 1: FALSE 152234 -- as in, all of them, so no NA values
+print(count(works, is.na(has_fulltext)))
+print(count(works, is.na(oa_is_oa)))
+print(count(works, is.na(oa_status)))
+
+print(count(works, is.na(primary_topic)))  # 2: TRUE   16640
+print(count(works, is.na(primary_topic_subfield)))  # 2: TRUE   16640
+print(count(works, is.na(primary_topic_field)))  # 2: TRUE   16640
+print(count(works, is.na(primary_topic_domain)))  # 2: TRUE   16640
+
+print(count(works, is.na(primary_source_display_name)))  # 1: FALSE 152234 -- as in, all of them, so no NA values
+
+```
+
+
+9)  Variable Selection
+
+Also need to look at more of the variables to see which ones I REALLY need to keep  [EDIT:  Can SELECT _OUT_ the following -  pmid, mag, publication_date, biblio_*, primary_source_type, primary_source_issn_1, created_date, and updated_date - and language and is.retracted after those have been filtered - should get the dataframe down to 21 variables]
+
+
+
+```{r Data exploration -  "works" - publication dates }
+
+tally_dates <- works %>% 
+  count(publication_year, sort = TRUE, name = "tally")
+
+str(tally_dates)  # Classes ‘data.table’ and 'data.frame':	89 obs. of  2 variables
+
+# min(tally_dates$publication_year)  # [1] 1800
+# max(tally_dates)  [1] 6690
+
+# these last 2 lines are kindof useless, but...
+# once I finish filtering/selecting - looking at changes over time will be important
+# cursory observation: mostly gradual increase, but some years show big jump
+# would want to run test of significance to see if spikes are worth investigating
+
+```
+
+
+
+Going back over notes from the other day, want to see if it seems like there are differences between the 3 source groups for the (potential) collaboration variables, the fwci, and maybe the numbers of some of the binary variables.  
+
+All of this could be useful, and can run a test of significance later - but for now, it's still unfiltered data - need to re-run this after I've filtered by language, type, and is.retracted.  
+
+```{r Data Exploration - differences between source groups}
+ 
+source_group_difs <- works %>% 
+  filter(!is.na(fwci)) %>% 
+  group_by(source_group) %>% 
+  summarise(mean_cited = mean(cited_by_count),
+            mean_references = mean(referenced_works_count),
+            mean_locations = mean(locations_count),
+            mean_countries = mean(countries_distinct_count),
+            mean_institutions = mean(institutions_distinct_count), 
+            mean_fwci = mean(fwci))
+
+```
