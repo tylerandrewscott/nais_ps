@@ -143,15 +143,25 @@ n_distinct(refs_filt_overlap$citation_id)  # [1] 19955 - this matches the length
 
 ```
 
-Step 7) Filter out the rows with no references
+Step 7) Limit the works to just those references that are found in both the citing and cited columns of refs
 
-```{r further subsetting the "works"}
-
-# see code chunk in "02b" for exploration of this occurrence
+```{r subsetting the filtered works to match the overlapping refs}
 
 
-filt_works <- filt_works %>% 
-  filter(referenced_works_count != 0)
+filt_overlap_works <- filt_works %>% 
+  filter(work_id %in% refs_filt_overlap$citation_id)
+
+nrow(filt_overlap_works) # [1] 19898
+nrow(refs_filt_overlap) - nrow(filt_overlap_works)  # [1] 57
+
+print(count(filt_overlap_works, is.na(work_id)))  # 1:          FALSE 19898, no so "NA" values
+
+# so, there are 57 references in the overlapping "refs" that 
+#   do not show up when I intersect the filtered works with these overlapping references
+
+# see "O2b" for the process to identify the 57
+# all have been removed during the filtering process
+# therefore, can use the object "filt_overlap_works" for subsequent analysis
 
 
 ```
@@ -165,7 +175,6 @@ Step 9) Next, limit the "works" entries to just those found to overlap in the "r
 
 
 
-
 ```{r investigating the "primary topic" variables of the filtered works}
 
 # tally_primary_topic_field_filtered <- count(filt_works, primary_topic_field, sort = TRUE, name = "tally")
@@ -176,7 +185,7 @@ n_distinct(filt_works$primary_topic_domain)  # [1] 4
 n_distinct(filt_works$primary_topic_field)  # [1] 26
 n_distinct(filt_works$primary_topic_subfield)  # [1] 199
 
-n_distinct(filt_works$primary_topic_subfield[filt_works$primary_topic_field == "Social Sciences"])  # [1] 21 (Wait, really?!?)
+n_distinct(filt_works$primary_topic_subfield[filt_works$primary_topic_field == "Social Sciences"])  # [1] 21 
 n_distinct(filt_works$primary_topic[filt_works$primary_topic_field == "Social Sciences"])  # [1] 535
 
 tally_by_primary_field <- filt_works %>% 
@@ -187,33 +196,23 @@ tally_by_primary_field <- filt_works %>%
   select(primary_topic_field, n_subfields, n_topics) %>% 
   distinct(primary_topic_field, .keep_all = TRUE) # %>% 
   # arrange(desc(n))
-  
-indig_prim_field <- filt_works %>% 
-  # group_by(primary_topic_field) %>%
-  filter(str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>% 
-  group_by(primary_topic) %>%  # group_by(primary_topic_field)
-  summarise(n_Indig = n())
 
-indig_title <- filt_works %>% 
-  # group_by(primary_topic_field) %>%
-  filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>% 
-  group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
-  summarise(n_Indig = n())
-  
-  output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
 file_name_fields <- "Subfields_Topics.csv"
 full_output_path_fields <- file.path(output_directory, file_name_fields)
 
 write_excel_csv(tally_by_primary_field, file = full_output_path_fields)
+
+
+# might be helpful to look at the works just for some of the fields, 
+# or at least to look at the different subfield frequencies
+
 
 prim_field_biochem <- filt_works %>% 
   filter(primary_topic_field == "Biochemistry, Genetics and Molecular Biology")
 
 prim_field_socsci <- filt_works %>% 
   filter(primary_topic_field == "Social Sciences")
-
-indig_socsci <- str_count(prim_field_socsci$primary_topic, "Indig") %>% 
-  filter()
 
 prim_field_envsci <- filt_works %>% 
   filter(primary_topic_field == "Environmental Science")
@@ -234,11 +233,142 @@ biochem_topics <- prim_field_biochem %>%
   count(primary_topic, sort = TRUE, name = "n_topics") %>% 
   mutate(n_subfields = count(primary_topic_subfield, ))
 
+```
 
+```{r investigating the "primary topic" variables of the filtered AND overlapping works}
+
+n_distinct(filt_overlap_works$primary_topic)  # [1] 577
+n_distinct(filt_overlap_works$primary_topic_domain)  # [1] 4
+n_distinct(filt_overlap_works$primary_topic_field)  # [1] 19
+n_distinct(filt_overlap_works$primary_topic_subfield)  # [1] 105
+
+n_distinct(filt_overlap_works$primary_topic_subfield[filt_overlap_works$primary_topic_field == "Social Sciences"])  # [1] 17 
+n_distinct(filt_overlap_works$primary_topic[filt_overlap_works$primary_topic_field == "Social Sciences"])  # [1] 183
+
+overlap_by_primary_field <- filt_overlap_works %>% 
+  group_by(primary_topic_field) %>%
+  summarise(n = n())
+  # mutate(n = summarise(n(primary_topic))) %>%  # This does NOT work
+  mutate(n_subfields = n_distinct(primary_topic_subfield)) %>% 
+  mutate(n_topics = n_distinct(primary_topic)) %>% 
+  select(primary_topic_field, n_subfields, n_topics) %>% 
+  distinct(primary_topic_field, .keep_all = TRUE) # %>% 
+  # arrange(desc(n))
+  
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_fields <- "Subfields_Topics_overlap.csv"
+full_output_path_fields <- file.path(output_directory, file_name_fields)
+
+write_excel_csv(overlap_by_primary_field, file = full_output_path_fields)
+
+# --- Deeper dive into top 8 fields --- #
+
+prim_field_socsci_overlap <- filt_overlap_works %>% 
+  filter(primary_topic_field == "Social Sciences")
+
+prim_field_econ_overlap <- filt_overlap_works %>% 
+  filter(primary_topic_field == "Economics, Econometrics and Finance")
+
+prim_field_envirosci_overlap <- filt_overlap_works %>% 
+  filter(primary_topic_field == "Environmental Science")
+
+prim_field_energy_overlap <- filt_overlap_works %>% 
+  filter(primary_topic_field == "Energy")
+
+prim_field_eng_overlap <- filt_overlap_works %>% 
+  filter(primary_topic_field == "Engineering")
+
+prim_field_busmgmt_overlap <- filt_overlap_works %>% 
+  filter(primary_topic_field == "Business, Management and Accounting")
+
+prim_field_decsci_overlap <- filt_overlap_works %>% 
+  filter(primary_topic_field == "Decision Sciences")
+
+prim_field_health_overlap <- filt_overlap_works %>% 
+  filter(primary_topic_field == "Health Professions")
+
+prim_field_agbio_overlap <- filt_overlap_works %>% 
+  filter(primary_topic_field == "Agricultural and Biological Sciences")
+
+# --- Base R option --- #
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "SocSci_overlap_subfields2.csv"
+full_output_path_fields <- file.path(output_directory, file_name)
+
+write_excel_csv(as.data.frame(table(prim_field_socsci_overlap$primary_topic_subfield)), file = full_output_path_fields)
+
+# --- #
+
+# --- Tidy option --- #
+
+# run for each of the 9 fields above
+# no need to copy code, will just replace the necessary components
+
+agbio_overlap_topics <- prim_field_agbio_overlap %>% 
+  group_by(primary_topic_subfield) %>% 
+  summarise(n_subfield = n())
+ 
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "AgBio_overlap_subfields.csv"
+full_output_path_fields <- file.path(output_directory, file_name)
+
+write_excel_csv(agbio_overlap_topics, file = full_output_path_fields)
 
 ```
 
 
+```{r tallying "Indigenous"}
+
+# run 1:  BEFORE limiting the "filt_works" to just those that appear in the overlapping reference list
+  ## each command starts by piping in "filt_works" 
+
+# run 2:  AFTER limiting the "filt_works" to just those that appear in the overlapping reference list
+  ## each command starts by piping in "filt_overlap_works" 
+
+indig_title_topic_or <- filt_overlap_works %>% 
+  filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native") | 
+           str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%  # space between terms OK!
+  group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
+  summarise(n_Indig = n())
+
+# for a deeper look at the works that appear in both the citing and cited columns of the original "refs" 
+# AND also have "Indigenous" or something along those lines in either the title or the primary_topic field:
+# use the code above, but only before the "group_by"
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_indig <- "Overlap_Indigenous.csv"
+full_output_path_fields <- file.path(output_directory, file_name_indig)
+
+write_excel_csv(indig_title_topic_or, file = full_output_path_fields)
+
+
+
+# ---------------
+# just need the above code
+# verified that the above captures everything correctly using the intermediaries below
+# did so for both runs
+
+indig_prim_topic <- filt_overlap_works %>% 
+  filter(str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%  # no spaces between terms!
+  group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
+  summarise(n_Indig = n())
+
+indig_title <- filt_overlap_works %>% 
+  filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>% 
+  group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
+  summarise(n_Indig = n())
+
+
+indig_title_topic_both <- filt_overlap_works %>% 
+  # group_by(primary_topic_field) %>%
+  filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native") & 
+           str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>% 
+  group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
+  summarise(n_Indig = n())
+
+```
 
 
 ```{r Elise's help}
@@ -270,7 +400,7 @@ write_excel_csv(df, file = full_output_path_fields)
 
 ```{r Elise's help} 
 
-table(filt_works$)
+# table(filt_works$)
 
 ```
 
@@ -314,36 +444,34 @@ print(count(test5, is.na(work_id)))  # 1:          FALSE 126790  --  wait, that'
 
 ```
 
-```{r need to find the 53 citations from the overlapping references that aren't in the filtered works}
+```{r need to find the 57 citations from the overlapping references that aren't in the filtered works}
 
-test5_na <- test5 %>%
+refs_to_join <- refs_filt_overlap %>% 
+  select(work_id = citation_id)
+
+joined_refs_works <- full_join(filt_works, refs_to_join, by = "work_id")
+
+nrow(joined_refs_works)  # [1] 103132
+nrow(joined_refs_works) - nrow(filt_works)  # [1] 57
+
+print(count(joined_refs_works, is.na(work_id)))  # 1:  FALSE 103132 (so no NA values in the work_id)
+print(count(joined_refs_works, is.na(source_id)))   # 2: TRUE     57
+
+missing_refs_only <- joined_refs_works %>%
   filter(is.na(source_id))
 
-# I want to explore these manually since there are only 53 of them
+# I want to explore these manually since there are only 57 of them
 # need to write a csv and do this in Excel
-
-getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
-
-# great, but I want it in the "data_output" folder
-
-# setwd("~/data_output")  # Error in setwd("~/data_output") : cannot change working directory
-
-# Googled it 
-# Specify directory and file-name components, use them to construct the full path
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
 file_name <- "Refs_not_in_Works.csv"
 full_output_path <- file.path(output_directory, file_name)
 
-# write_excel_csv(test5_na, "Refs_not_in_Works")  # , "/data_output")
-
-# write_excel_csv(test5_na, file = full_output_path)
-
 
 ##  ACTUALLY -- there's a faster way to do this...
 
 refs_not_in_works <- works %>%
-  filter(work_id %in% test5_na$work_id)
+  filter(work_id %in% missing_refs_only$work_id)
 
 write_excel_csv(refs_not_in_works, file = full_output_path)
 
