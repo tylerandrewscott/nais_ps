@@ -1,5 +1,5 @@
 ---
-title: " 02_bibliometrics_data_subsetting_clean"
+title: " 02b_bibliometrics_data_subsetting_exploration"
 author: "Mackenzie Johnson"
 date: "20260401"
 output: html_document
@@ -44,120 +44,150 @@ refs <- readRDS(file = "data/refs.rds")
 
 ```
 
-Step 1)  filter the "works" rds by:
-  - language (keep only those works in English)
-  - type (keep only articles and reviews)
-  - is.retracted (keep only those that have NOT been retracted)
- 
- Step 2) verify those worked by looking at the number of distinct values
- 
- Step 3) filter out additional observations by:
-  - publication year (keep only pre-2026)
-  - title (remove those with blank titles)
-  - primary topic (remove NA) [see code in "02b" for exploration of this variable]
-  - fwci (remove NA) [see code in "02b" for exploration of this variable]
-  - references_counted (remove any 0 values) [see code in "02b" for exploration of this variable]
+The data subsetting step of this project was an iterative process.  After initially subsetting based on language, type, retraction, and publication year, and removing those with blank values for the title, I wanted to explore several other attributes of the data.  
 
-Step 4) select out several variables
-  - (In Liza's code, she only used work_id, publication year, language, type, and referenced_works_count, but I will keep other variables.)
+1) NA values for either the primary topic or fwci - I then filtered the "filt_works" object based on this exploration 
 
+```{r Data Exploration - "filt_works" - NA removal} 
 
-```{r subsetting the "works" rds}
+print(count(filt_works, is.na(title)))  # 1:        FALSE 142103 -- as in, all of them, so no NA values
 
-# originally had this filtered to just "article" but based on Wood et al. (2025), decided to also keep "review", "book" and "book-chapter" 
+print(count(filt_works, is.na(fwci)))  # 2:        TRUE  10694
+print(count(filt_works, is.na(primary_topic)))  # 2: TRUE   10680  
+print(count(filt_works, is.na(primary_topic_subfield)))  # 2: TRUE   10680
+print(count(filt_works, is.na(primary_topic_field)))  # 2: TRUE   10680
+print(count(filt_works, is.na(primary_topic_domain)))  # 2: TRUE   10680
 
-filt_works <- works %>% 
-  filter(language == "en") %>% 
-  filter(type == "article" | type == "review") %>%  # | type == "book" | type == "book-chapter") 
-  filter(is_retracted == "FALSE") %>% 
-  filter(publication_year != 2026) %>% 
-  filter(title != "") %>% 
-  filter(!is.na(primary_topic)) %>% 
-  filter(!is.na(fwci)) %>% 
-  filter(referenced_works_count != 0) %>% 
-  select(-pmid, -mag, -publication_date, -language, -is_retracted, -is_paratext, -biblio_volume, -biblio_issue, -biblio_first_page, -biblio_last_page, -primary_source_type, -primary_source_issn_l, -created_date, -updated_date)
-
-
-#  want to test to make sure the filtering worked
-
-n_distinct(filt_works$language)  # [1] 1  IT WORKED
-n_distinct(filt_works$type)  # [1] 2  IT WORKED
-n_distinct(filt_works$is_retracted)  # [1] 1  IT WORKED
-n_distinct(filt_works$is_paratext)  # [1] 1  Didn't filter by this variable, but expected this result
-
-# now I can go back and select out more columns
-# end result for now is 21 variables
-    # could probably select out more, but want to look at more bibliometric analyses first
+#  after filtering out the NA values for "primary_topic" - all the "primary_topic_..." variables have no NA values
+# and "fwci" only has 14 values, so I'll filter those out 
+# can see from Global Environments it worked - now there are 131409 observations
 
 ```
 
 
-Moving on to the "refs" rds
+2) Works with 0 values for "referenced_works_count" - I then filtered the "filt_works" object based on this exploration
 
-Step 5) keep only those articles that were cited at least 5 times (per Wood et al. 2025)  
+```{r Data Exploration - "filt_works" - works with no references }
 
-Step 6) Once I have filtered it down to only those references with 5 or more citations, find just those articles that appear as both "citing" and "cited" - use %in%
+print(min(filt_works$referenced_works_count))
+print(count(filt_works, referenced_works_count == 0))
+
+    # referenced_works_count == 0      n
+                            # <lgcl>  <int>
+    # 1:                       FALSE 103075
+    # 2:                        TRUE  28334  
+
+count_no_refs <- as.integer(count(filt_works[referenced_works_count == 0]))  
+
+tally_no_refs_by_source_group <- filt_works %>% 
+  filter(referenced_works_count == 0) %>% 
+  group_by(source_group) %>%  # group_by(source_id) -- gets the same tally as "by_journal" but now with source_id, not journal name
+  summarise(n = n()) %>% 
+  mutate(pct = n/count_no_refs) %>% 
+  print()
 
 
-```{r subsetting the "refs" rds}
-
-refs_citing_only <- refs %>% 
-  count(citing_id, sort = TRUE, name = "tally") %>% 
-  filter(tally >= 5) %>% 
-  select(-tally, from = citing_id)
+tally_no_refs_by_journal <- filt_works %>% 
+  filter(referenced_works_count == 0) %>% 
+  group_by(primary_source_display_name) %>% 
+  summarise(n = n()) %>% 
+  mutate(pct = n/count_no_refs) %>% 
+  arrange(desc(n))
   
-refs_cited_only <- refs %>% 
-  count(cited_id, sort = TRUE, name = "tally") %>% 
-  filter(tally >= 5) %>% 
-  select(-tally, to = cited_id)
+
+count(referenced_works_count, sort = FALSE, name = "tally")
+
+length(filt_works$referenced_works_count[filt_works$referenced_works_count < 10])  # 43782
+length(filt_works$referenced_works_count[filt_works$referenced_works_count >= 10])  # 87627
+
+no_refs_in_works <- filt_works %>% 
+  filter(referenced_works_count == 0)
+
+str(no_refs_in_works)  # Classes ‘data.table’ and 'data.frame':	25529 obs. of  21 variables
+
+no_refs_overlap <- no_refs_in_works %>% 
+  filter(work_id %in% refs_filtered_overlap$citation)
+
+str(no_refs_overlap)  # Classes ‘data.table’ and 'data.frame':	0 obs. of  21 variables
+
+no_refs_in_works_open <- filt_works %>% 
+  filter(referenced_works_count == 0) %>% 
+  filter(oa_status != "closed")
+
+str(no_refs_in_works_open)  # Classes ‘data.table’ and 'data.frame':	2422 obs. of  21 variables
+length(no_refs_in_works_open$has_fulltext[no_refs_in_works_open$has_fulltext == "TRUE"])  # 720 - these have full text
+length(no_refs_in_works_open$oa_is_oa[no_refs_in_works_open$oa_is_oa == "TRUE"]) # [1] 2422 - good, SHOULD match the length of the df
+n_distinct(no_refs_in_works_open$oa_is_oa)  # [1] 1 - yep, apparently they are all OA - that 1 value is "TRUE")
 
 
-refs_filt_overlap <- refs_citing_only %>% 
-  filter(from %in% refs_cited_only$to) %>% 
-  mutate(citation_id = from) %>% 
-  select(-from)
-
-# cited_in_citing <- refs_cited_only %>% 
- #  filter(to %in% refs_citing_only$from)  
-
-# 19955 observations
+# OK, so seems like none of the references with zero values for the "referenced_works_count" show up in the "refs" rds
+# even if their OA status is NOT closed
 
 
-n_distinct(refs_filt_overlap$citation_id)  # [1] 19955 - this matches the length of the dataframe!
+one_refs_in_works <- filtered_works %>% 
+  filter(referenced_works_count == 1)
 
-# Seems to have worked  
-# given that the number of distinct values equals the number of observations
+str(one_refs_in_works)  # Classes ‘data.table’ and 'data.frame':	2358 obs. of  21 variables
 
-```
+one_refs_overlap <- one_refs_in_works %>% 
+  filter(work_id %in% refs$cited_id)
 
-Step 7) Limit the works to just those references that are found in both the citing and cited columns of refs
-[see code in "02b" for exploration of this variable]
+str(one_refs_overlap)  # Classes ‘data.table’ and 'data.frame':	1005 obs. of  21 variables
 
-```{r subsetting the filtered works to match the overlapping refs}
-
-
-filt_overlap_works <- filt_works %>% 
-  filter(work_id %in% refs_filt_overlap$citation_id)
-
-nrow(filt_overlap_works) # [1] 19898
-nrow(refs_filt_overlap) - nrow(filt_overlap_works)  # [1] 57
-
-print(count(filt_overlap_works, is.na(work_id)))  # 1:          FALSE 19898, no so "NA" values
-
-# so, there are 57 references in the overlapping "refs" that 
-#   do not show up when I intersect the filtered works with these overlapping references
-
-# see "O2b" for the process to identify the 57
-# all have been removed during the filtering process
-# therefore, can use the object "filt_overlap_works" for subsequent analysis
-
+# BUT, as soon as there is a single referenced work, then there is overlap
 
 ```
 
 
-Step 8) Filter out rows based on primary topic information
+3) Verification that intersecting the filtered works with the overlapping references worked.  
+
+This step used %in% to select just those observations in the the "filt_works" object that are found in the "refs_filt_overlap" object.  But the number of observations of the new object did NOT match the number in the list of overlapping references; the following code shows how the intersection was verified.
+
+(Prior to using the %in% approach for this step, I tested the different types of joins to see if either of them seemed like a better option.  That code is in the "02_bibliometrics_data_subsetting_tests" rmd.)
 
 
+```{r need to find the 57 citations from the overlapping references that aren't in the filtered works}
+
+refs_to_join <- refs_filt_overlap %>% 
+  select(work_id = citation_id)
+
+joined_refs_works <- full_join(filt_works, refs_to_join, by = "work_id")
+
+nrow(joined_refs_works)  # [1] 103132
+nrow(joined_refs_works) - nrow(filt_works)  # [1] 57
+
+print(count(joined_refs_works, is.na(work_id)))  # 1:  FALSE 103132 (so no NA values in the work_id)
+print(count(joined_refs_works, is.na(source_id)))   # 2: TRUE     57
+
+missing_refs_only <- joined_refs_works %>%
+  filter(is.na(source_id))
+
+# I want to explore these manually since there are only 57 of them
+# need to write a csv and do this in Excel
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "Refs_not_in_Works.csv"
+full_output_path <- file.path(output_directory, file_name)
+
+
+##  ACTUALLY -- there's a faster way to do this...
+
+refs_not_in_works <- works %>%
+  filter(work_id %in% missing_refs_only$work_id)
+
+write_excel_csv(refs_not_in_works, file = full_output_path)
+
+# OK, found them!  
+# in the spreadsheet, I highlighted why each would have been filtered out
+# so, should definitely use either the %in% or one of the joins that does NOT keep the "refs" that aren't in the "works"
+
+```
+
+
+
+4) I considered filtering out rows based on primary topic information
+
+I did this both before and after I intersected the "filt_works" with the "refs_filt_overlap".  The results were either copied and pasted into Excel or exported as a csv and copied into a spreadsheet ("Bilbiometrics_R_to_Excel").  
 
 
 ```{r investigating the "primary topic" variables of the filtered works}
@@ -391,80 +421,6 @@ write_excel_csv(df, file = full_output_path_fields)
 
 
 
-```{r subsetting the filtered works to match the overlapping refs}
-
-# lots of options
-# start with "%in%" and then test the different join functions
-
-test <- filtered_works %>% 
-  filter(work_id %in% filtered_refs_overlap$citation)
-
-print(count(test, is.na(work_id)))  # 1:          FALSE 18924 -- so no NA values, and 53 fewer observations than the refs alone
-
-f_refs_overlap <- filtered_refs_overlap %>% 
-  select(work_id = citation)
-
-test2 <- inner_join(filtered_works, f_refs_overlap, by = "work_id")
-  # Error in 'inner_join()'
-  # `by` must be a (named) character vector, list, `join_by()` result, or NULL, not a function.
-      # added "" around [citation]
-        # Error in `inner_join()`:
-        # ! Join columns in `x` must be present in the data.
-
-
-  # typeof(filtered_refs_overlap$citation)
-
-test3 <- left_join(filtered_works, f_refs_overlap, by = "work_id")
-print(count(test3, is.na(work_id)))  # 1:          FALSE 126737 -- should have returned (126737-18977 = 107760) NA values...?
-  # WAIT!  Shouldn't be looking for NA in the work_id, should be looking in another column - maybe "source_id"
-
-test4 <- right_join(filtered_works, f_refs_overlap, by = "work_id")
-print(count(test4, is.na(work_id)))  # 1:          FALSE 18977 -- good, would have been off if there were any NA values
-
-test5 <- full_join(filtered_works, f_refs_overlap, by = "work_id")
-print(count(test5, is.na(work_id)))  # 1:          FALSE 126790  --  wait, that's more than in "filtered_works" - by 53
-
-# OK, so there are 53 observations that I'm filtering out of the "works" rds that 
-# are still captured by my "filtered_refs_overlap" dataframe
-
-```
-
-```{r need to find the 57 citations from the overlapping references that aren't in the filtered works}
-
-refs_to_join <- refs_filt_overlap %>% 
-  select(work_id = citation_id)
-
-joined_refs_works <- full_join(filt_works, refs_to_join, by = "work_id")
-
-nrow(joined_refs_works)  # [1] 103132
-nrow(joined_refs_works) - nrow(filt_works)  # [1] 57
-
-print(count(joined_refs_works, is.na(work_id)))  # 1:  FALSE 103132 (so no NA values in the work_id)
-print(count(joined_refs_works, is.na(source_id)))   # 2: TRUE     57
-
-missing_refs_only <- joined_refs_works %>%
-  filter(is.na(source_id))
-
-# I want to explore these manually since there are only 57 of them
-# need to write a csv and do this in Excel
-
-output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name <- "Refs_not_in_Works.csv"
-full_output_path <- file.path(output_directory, file_name)
-
-
-##  ACTUALLY -- there's a faster way to do this...
-
-refs_not_in_works <- works %>%
-  filter(work_id %in% missing_refs_only$work_id)
-
-write_excel_csv(refs_not_in_works, file = full_output_path)
-
-# OK, found them!  
-# in the spreadsheet, I highlighted why each would have been filtered out
-# so, should definitely use either the %in% or one of the joins that does NOT keep the "refs" that aren't in the "works"
-
-```
 
 
 ```{r subsetting the "refs" rds using %in% }
@@ -510,73 +466,3 @@ n_distinct(refs_filtered_overlap$citation)  # [1] 18977 - this matches the lengt
 
 
 
-```{r Data Exploration - "filt_works" - works with no references }
-
-print(min(filt_works$referenced_works_count))
-print(count(filt_works, referenced_works_count == 0))
-
-    # referenced_works_count == 0      n
-                            # <lgcl>  <int>
-    # 1:                       FALSE 103075
-    # 2:                        TRUE  28334  
-
-count_no_refs <- as.integer(count(filt_works[referenced_works_count == 0]))  
-
-tally_no_refs_by_source_group <- filt_works %>% 
-  filter(referenced_works_count == 0) %>% 
-  group_by(source_group) %>%  # group_by(source_id) -- gets the same tally as "by_journal" but now with source_id, not journal name
-  summarise(n = n()) %>% 
-  mutate(pct = n/count_no_refs) %>% 
-  print()
-
-
-tally_no_refs_by_journal <- filt_works %>% 
-  filter(referenced_works_count == 0) %>% 
-  group_by(primary_source_display_name) %>% 
-  summarise(n = n()) %>% 
-  mutate(pct = n/count_no_refs) %>% 
-  arrange(desc(n))
-  
-
-count(referenced_works_count, sort = FALSE, name = "tally")
-
-length(filt_works$referenced_works_count[filt_works$referenced_works_count < 10])  # 43782
-length(filt_works$referenced_works_count[filt_works$referenced_works_count >= 10])  # 87627
-
-no_refs_in_works <- filt_works %>% 
-  filter(referenced_works_count == 0)
-
-str(no_refs_in_works)  # Classes ‘data.table’ and 'data.frame':	25529 obs. of  21 variables
-
-no_refs_overlap <- no_refs_in_works %>% 
-  filter(work_id %in% refs_filtered_overlap$citation)
-
-str(no_refs_overlap)  # Classes ‘data.table’ and 'data.frame':	0 obs. of  21 variables
-
-no_refs_in_works_open <- filt_works %>% 
-  filter(referenced_works_count == 0) %>% 
-  filter(oa_status != "closed")
-
-str(no_refs_in_works_open)  # Classes ‘data.table’ and 'data.frame':	2422 obs. of  21 variables
-length(no_refs_in_works_open$has_fulltext[no_refs_in_works_open$has_fulltext == "TRUE"])  # 720 - these have full text
-length(no_refs_in_works_open$oa_is_oa[no_refs_in_works_open$oa_is_oa == "TRUE"]) # [1] 2422 - good, SHOULD match the length of the df
-n_distinct(no_refs_in_works_open$oa_is_oa)  # [1] 1 - yep, apparently they are all OA - that 1 value is "TRUE")
-
-
-# OK, so seems like none of the references with zero values for the "referenced_works_count" show up in the "refs" rds
-# even if their OA status is NOT closed
-
-
-one_refs_in_works <- filtered_works %>% 
-  filter(referenced_works_count == 1)
-
-str(one_refs_in_works)  # Classes ‘data.table’ and 'data.frame':	2358 obs. of  21 variables
-
-one_refs_overlap <- one_refs_in_works %>% 
-  filter(work_id %in% refs$cited_id)
-
-str(one_refs_overlap)  # Classes ‘data.table’ and 'data.frame':	1005 obs. of  21 variables
-
-# BUT, as soon as there is a single referenced work, then there is overlap
-
-```
