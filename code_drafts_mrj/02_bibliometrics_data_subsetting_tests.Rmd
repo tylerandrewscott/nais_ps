@@ -390,3 +390,33 @@ n_distinct(filtered_refs_overlap$citation)  # [1] 18977 - this matches the lengt
     # max(tally_filtered_refs_overlap$tally)  # [1] 1
 
 ```
+
+
+```{r Elise's help}
+
+# Elise reminded me of a simpler way to get the counts - use "table"
+
+# table(filt_works$)
+
+  # but to write the table to csv, need to make it a dataframe
+  # as.data.frame(table(prim_field_biochem$primary_topic_subfield))
+
+# just need to write them to a csv
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "AgBio_subfields.csv"
+full_output_path_fields <- file.path(output_directory, file_name)
+
+write_excel_csv(as.data.frame(table(prim_field_agbio$primary_topic_subfield)), file = full_output_path_fields)
+
+table(filt_works$primary_topic)
+table(prim_field_biochem$primary_topic)
+table(prim_field_biochem$primary_topic_subfield)
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_fields <- "Subfields_Topics.csv"
+full_output_path_fields <- file.path(output_directory, file_name_fields)
+
+write_excel_csv(df, file = full_output_path_fields)
+
+```

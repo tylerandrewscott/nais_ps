@@ -189,6 +189,8 @@ write_excel_csv(refs_not_in_works, file = full_output_path)
 
 I did this both before and after I intersected the "filt_works" with the "refs_filt_overlap".  The results were either copied and pasted into Excel or exported as a csv and copied into a spreadsheet ("Bilbiometrics_R_to_Excel").  
 
+Take-away:  will NOT filter but could definitely do a deeper dive into a few of the topic fields.  
+
 
 ```{r investigating the "primary topic" variables of the filtered works}
 
@@ -334,6 +336,10 @@ write_excel_csv(agbio_overlap_topics, file = full_output_path_fields)
 ```
 
 
+Step 9) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the overlapping list of references, there are 56 observations that have "Indigenous|indigenous|tribal|tribe|Tribe|Native") in either the title or primary topic field - which equates to 0.28% of the works.  (In the full list of filtered references, including those not found in the overlapping references, there are 2860 observations - which equates to 2.8%.)
+
+It might be interesting to take a much closer look at teh 56 articles from the filter/overlapped works.  
+
 ```{r tallying "Indigenous"}
 
 # run 1:  BEFORE limiting the "filt_works" to just those that appear in the overlapping reference list
@@ -342,9 +348,13 @@ write_excel_csv(agbio_overlap_topics, file = full_output_path_fields)
 # run 2:  AFTER limiting the "filt_works" to just those that appear in the overlapping reference list
   ## each command starts by piping in "filt_overlap_works" 
 
+# in the "filter" line:
+  # space between the different calls is OK - BUT! - 
+  # do NOT include a space between the different terms of each "str_detect" call
+
 indig_title_topic_or <- filt_overlap_works %>% 
   filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native") | 
-           str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%  # space between terms OK!
+           str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%
   group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
   summarise(n_Indig = n())
 
@@ -358,7 +368,18 @@ full_output_path_fields <- file.path(output_directory, file_name_indig)
 
 write_excel_csv(indig_title_topic_or, file = full_output_path_fields)
 
+# to get the actual subset of just those articles that have Indigenous-specific language
+# in either the title or the primary topic
 
+indig_works <- filt_overlap_works %>% 
+  filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native") | 
+           str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native"))
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_indig_works <- "Indigenous_works.csv"
+full_output_path_fields <- file.path(output_directory, file_name_indig_works)
+
+write_excel_csv(indig_works, file = full_output_path_fields)
 
 # ---------------
 # just need the above code
@@ -366,7 +387,7 @@ write_excel_csv(indig_title_topic_or, file = full_output_path_fields)
 # did so for both runs
 
 indig_prim_topic <- filt_overlap_works %>% 
-  filter(str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%  # no spaces between terms!
+  filter(str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%
   group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
   summarise(n_Indig = n())
 
@@ -386,83 +407,8 @@ indig_title_topic_both <- filt_overlap_works %>%
 ```
 
 
-```{r Elise's help}
-
-# Elise reminded me of a simpler way to get the counts - use "table"
-
-  # but to write the table to csv, need to make it a dataframe
-  # as.data.frame(table(prim_field_biochem$primary_topic_subfield))
-
-# just need to write them to a csv
-
-output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name <- "AgBio_subfields.csv"
-full_output_path_fields <- file.path(output_directory, file_name)
-
-write_excel_csv(as.data.frame(table(prim_field_agbio$primary_topic_subfield)), file = full_output_path_fields)
-
-table(filt_works$primary_topic)
-table(prim_field_biochem$primary_topic)
-table(prim_field_biochem$primary_topic_subfield)
-
-output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name_fields <- "Subfields_Topics.csv"
-full_output_path_fields <- file.path(output_directory, file_name_fields)
-
-write_excel_csv(df, file = full_output_path_fields)
-
-```
-
-```{r Elise's help} 
-
-# table(filt_works$)
-
-```
 
 
-
-
-
-```{r subsetting the "refs" rds using %in% }
-
-refs_citing_only_2 <- refs %>% 
-  count(citing_id, sort = TRUE, name = "tally") %>% 
-  filter(tally >= 5) %>% 
-  select(-tally, from = citing_id)
-  
-refs_cited_only_2 <- refs %>% 
-  count(cited_id, sort = TRUE, name = "tally") %>% 
-  filter(tally >= 5) %>% 
-  select(-tally, to = cited_id)
-
-
-citing_in_cited <- refs_citing_only_2 %>% 
-  filter(from %in% refs_cited_only_2$to)
-
-cited_in_citing <- refs_cited_only_2 %>% 
-  filter(to %in% refs_citing_only_2$from)
-
-
-# now that I have isolated both the "citing_id" works and the "cited_id" works into their own dataframes, 
-# filtered them to just those works that appear 5 or more times
-# and have renamed them with the same column name
-# I should be able to intersect them
-
-# refs_filtered_overlap_2 <- intersect(refs_citing_only_2, refs_cited_only_2)  # doesn't work b/c columns don't have same name
-
-typeof(filtered_refs_overlap) # [1] "list"
-class(filtered_refs_overlap)  # [1] "data.table" "data.frame"
-
-n_distinct(refs_filtered_overlap$citation)  # [1] 18977 - this matches the length of the dataframe!
-
-# um - I think it worked!  
-# given that the number of distinct values equals the number of observations
-# and given the below
-    # tally_filtered_refs_overlap <- count(filtered_refs_overlap, citation, sort = TRUE, name = "tally")
-    # min(tally_filtered_refs_overlap$tally)  # [1] 1
-    # max(tally_filtered_refs_overlap$tally)  # [1] 1
-
-```
 
 
 
