@@ -1,0 +1,210 @@
+---
+title: "03_bibliometrics_networks"
+author: "Mackenzie Johnson"
+date: "2026-04-09"
+output: html_document
+---
+
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+# install.packages("pbapply")
+# install.packages("slam")
+
+library(data.table)
+library(ggplot2)
+library(igraph)
+library(knitr)
+library(Matrix)
+library(pbapply)
+library(slam)
+library(stringr)
+library(tidyverse)
+
+```
+
+
+```{r code for writing csvs}
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_fields <- "Subfields_Topics.csv"
+full_output_path_fields <- file.path(output_directory, file_name_fields)
+
+write_excel_csv(df, file = full_output_path_fields)
+
+```
+
+
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData1}
+
+works <- readRDS(file = "data/works.rds")
+refs <- readRDS(file = "data/refs.rds")
+
+# edgelist
+el <- readRDS(file = "data/network_edgelist_reduced")
+
+
+```
+
+Step 1)  Create a citation graph following Wood et al. (2025) - code is available in Liza Wood's Github repository "tamar"
+        a) start with a full graph
+        b) simplify it 
+
+```{r create citation graph}
+
+cit_graph <- graph_from_edgelist(as.matrix(el), directed = T)
+
+# str(cit_graph)
+
+# Class 'igraph'  hidden list of 10
+#  $ : num 69144
+
+# result is a "Large igraph (69144 elements, 12.4 MB)
+
+cit_graph <- igraph::simplify(cit_graph, remove.multiple = T, remove.loops = T)
+
+# result is a "Large igraph (69144 elements, 5 MB)
+
+```
+
+
+Step 2) Identify clusters
+        a) Find connected components of the graph
+        b) For those components with a membership size larger than 1 (i.e., connected to at least one other node), create a subgraph
+        c) run clustering algorithm
+        d) examine modularity
+    
+
+```{r a) find connected components}
+
+clus <- components(cit_graph)
+
+# result is a "Large list (3 elements, 5.5 MB)
+
+# str(clus)
+  # List of 3
+  # $ membership: Named num [1:69144]
+    # ..- attr(*, "names")= chr [1:69144] "W2599301038" ...
+  # $ csize     : num [1:9]
+  # $ no        : num 9
+
+# clus_summary <- clus %>% 
+#   group_by(membership) %>% 
+#  summarise(n = n())
+
+# Error in UseMethod("group_by") : 
+  # no applicable method for 'group_by' applied to an object of class "list"
+
+table(clus$membership)
+
+#     1     2     3     4     5     6     7     8     9 
+# 69041     9    11    19    15     9    15    12    13 
+
+connected_component <- names(clus$membership)[clus$membership!=1]
+# str(connected_component)  #  chr [1:103]
+
+```
+
+```{r b) create subgraph and undirected version}
+
+# this block is essentially copy-pasted from Liza's code
+
+if(any(clus$membership>1)){
+  cit_graph_main <- induced_subgraph(cit_graph,v = which(V(cit_graph)$name %in% connected_component))
+  cit_graph <- cit_graph_main
+}
+
+cit_graph_ud <- as.undirected(cit_graph, 'collapse')
+```
+
+```{r c) run clustering algorithm}
+
+# this block is essentially copy-pasted from Liza's code
+
+set.seed(12) 
+    seeds <- sample.int(9999, 1000)
+
+ mod <- list()
+    for(i in 1:length(seeds)){
+      set.seed(seeds[i])
+      louv <- cluster_louvain(cit_graph_ud)
+      mod$mod[i] <- modularity(louv)
+      mod$min_n[i] <- min(table(louv$membership))
+    }
+ 
+ mods <- unlist(mod$mod)
+    min_ns <- unlist(mod$min_n)
+
+```
+
+```{r d) examine modularity}
+pref_seed <- seeds[which(mods == max(mods))]
+
+set.seed(pref_seed) # 4262 with min size of 80, 2925 with min size of 30
+louv <- cluster_louvain(cit_graph_ud)
+V(cit_graph)$louv_cluster <- louv$membership
+
+# when I try to view "louv" - get an error message:
+# Error in names[[i]] : subscript out of bounds
+
+# modularity measure
+modularity(louv)
+B = modularity_matrix(cit_graph)
+
+summary(degree(cit_graph,mode = 'out'))
+  # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  # 0.00    0.00    1.00    1.35    1.00   13.00
+
+summary(degree(cit_graph,mode = 'in'))
+  #  Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  #  0.00    0.00    1.00    1.35    1.00   12.00
+
+summary(degree(cit_graph))
+  #  Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+  # 1.000   1.000   1.000   2.699   1.000  24.000
+
+# Add network summary
+table(louv$membership)
+mean(table(louv$membership))
+median(table(louv$membership))
+min(table(louv$membership))  # [1] 9
+max(table(louv$membership))  # [1] 19
+
+```
+
+```{r d) cluster descriptions}
+
+prank <- page_rank(cit_graph)
+V(cit_graph)$prank <- unlist(as.vector(prank$vector))
+
+betw <- betweenness(cit_graph)
+V(cit_graph)$betweenness <- as.vector(betw)
+betw_group <- data.table(node = V(cit_graph)$name,between = betw,group = V(cit_graph)$louv_cluster)
+betw_group[,grank:=rank(-between,ties.method = 'average'),by=.(group)]
+
+
+V(cit_graph)$high_between <- V(cit_graph)$name %in% betw_group[grank<=4,]$node
+
+#V(cit_graph)[betw == max(betw)]
+prank_max <- data.table(node = V(cit_graph)$name,group = unlist(V(cit_graph)$louv_cluster),pagerank = unlist(V(cit_graph)$prank))
+prank_max_by_group <- prank_max[,max(pagerank),by=.(group)]
+
+max_by_group = dplyr::left_join(prank_max,prank_max_by_group)[pagerank==V1,]
+
+V(cit_graph)$highest_in_group <- V(cit_graph)$name %in% max_by_group$node
+
+saveRDS(cit_graph, paste0(path_location,'cit_graph.rds'))
+
+```

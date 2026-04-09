@@ -135,7 +135,6 @@ Step 7) Limit the "filt_works" to just those references that are found in both t
 
 ```{r subsetting the filtered works to match the overlapping refs}
 
-
 filt_overlap_works <- filt_works %>% 
   filter(work_id %in% refs_filt_overlap$citation_id)
 
@@ -151,6 +150,10 @@ print(count(filt_overlap_works, is.na(work_id)))  # 1:          FALSE 19898, no 
 # all have been removed during the filtering process
 # therefore, can use the object "filt_overlap_works" for subsequent analysis
 
+# will save this as the nodelist for network analysis
+
+saveRDS(filt_overlap_works, "network_nodelist")
+
 ```
 
 
@@ -158,3 +161,24 @@ Step 8) Considered filtering based on the different "primary_topic*" variables. 
 
 Step 9) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the overlapping list of references, there are 56 observations that have "Indigenous|indigenous|tribal|tribe|Tribe|Native") in either the title or primary topic field - which equates to 0.28% of the works.  (In the full list of filtered references, including those not found in the overlapping references, there are 2860 observations - which equates to 2.8%.)  [see code in "02b" for exploration of this occurrence] 
 
+Step 10) Having created the node list for the network analysis, need to also create the edge list.
+
+```{r Creating the edgelist}
+
+network_edgelist_full <- refs %>% 
+  filter(citing_id %in% refs_citing_only$from | 
+           cited_id %in% refs_cited_only$to)
+
+network_edgelist_overlap1 <- refs %>% 
+  filter(citing_id %in% filt_overlap_works$work_id | 
+                       cited_id %in% filt_overlap_works$work_id)
+
+# n = 460956
+
+# remove self references
+
+network_edgelist_overlap2 <-network_edgelist_overlap1[citing_id != cited_id]
+
+saveRDS(network_edgelist_overlap2, "network_edgelist_reduced")
+
+```
