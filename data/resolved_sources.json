@@ -1,0 +1,394 @@
+{
+  "sources": [
+    {
+      "group": "nais",
+      "query_name": "AlterNative-An International Journal of Indigenous Peoples",
+      "source_id": "S13948593",
+      "openalex_name": "AlterNative An International Journal of Indigenous Peoples"
+    },
+    {
+      "group": "nais",
+      "query_name": "American Indian and Alaska Native Mental Health Research",
+      "source_id": "S4210175943",
+      "openalex_name": "American Indian and Alaska Native Mental Health Research"
+    },
+    {
+      "group": "nais",
+      "query_name": "American Indian Culture and Research Journal ()",
+      "source_id": "S32628711",
+      "openalex_name": "American Indian Culture and Research Journal"
+    },
+    {
+      "group": "nais",
+      "query_name": "American Indian Law Review",
+      "source_id": "S4210179730",
+      "openalex_name": "American Indian Law Review"
+    },
+    {
+      "group": "nais",
+      "query_name": "American Indian Quarterly",
+      "source_id": "S188904407",
+      "openalex_name": "The American Indian Quarterly"
+    },
+    {
+      "group": "nais",
+      "query_name": "Australian Journal of Indigenous Education",
+      "source_id": "S2764868871",
+      "openalex_name": "The Australian Journal of Indigenous Education"
+    },
+    {
+      "group": "nais",
+      "query_name": "Australian Journal of Political Science",
+      "source_id": "S132538520",
+      "openalex_name": "Australian Journal of Political Science"
+    },
+    {
+      "group": "nais",
+      "query_name": "Aboriginal Policy Studies",
+      "source_id": "S4210174853",
+      "openalex_name": "aboriginal policy studies"
+    },
+    {
+      "group": "nais",
+      "query_name": "Canadian Journal of Native Studies",
+      "source_id": "S2764853463",
+      "openalex_name": "Canadian journal of native studies"
+    },
+    {
+      "group": "nais",
+      "query_name": "Cultural Survival Quarterly",
+      "source_id": "S2765048291",
+      "openalex_name": "Cultural survival quarterly"
+    },
+    {
+      "group": "nais",
+      "query_name": "Decolonization: Indigeneity, Education & Society",
+      "source_id": "S4306507627",
+      "openalex_name": "Decolonization: Indigeneity, Education & Society"
+    },
+    {
+      "group": "nais",
+      "query_name": "EcoHealth",
+      "source_id": "S27405227",
+      "openalex_name": "EcoHealth"
+    },
+    {
+      "group": "nais",
+      "query_name": "Ethnic and Racial Studies",
+      "source_id": "S96629499",
+      "openalex_name": "Ethnic and Racial Studies"
+    },
+    {
+      "group": "nais",
+      "query_name": "Indigenous Peoples' Journal of Law, Culture, and Resistance",
+      "source_id": "S4210185378",
+      "openalex_name": "Indigenous peoples' journal of law, culture, & resistance"
+    },
+    {
+      "group": "nais",
+      "query_name": "International Indigenous Policy Journal",
+      "source_id": "S2739297695",
+      "openalex_name": "International Indigenous Policy Journal"
+    },
+    {
+      "group": "nais",
+      "query_name": "International Journal of Critical Indigenous Studies",
+      "source_id": "S4210203256",
+      "openalex_name": "International Journal of Critical Indigenous Studies"
+    },
+    {
+      "group": "nais",
+      "query_name": "International Journal of Indigenous Health",
+      "source_id": "S2764525582",
+      "openalex_name": "International Journal of Indigenous Health"
+    },
+    {
+      "group": "nais",
+      "query_name": "Journal of American Indian Education",
+      "source_id": "S2765036210",
+      "openalex_name": "The Journal of American Indian Education"
+    },
+    {
+      "group": "nais",
+      "query_name": "Latin American Research Review",
+      "source_id": "S59607649",
+      "openalex_name": "Latin American Research Review"
+    },
+    {
+      "group": "nais",
+      "query_name": "MAI Journal: A New Zealand Journal of Indigenous Scholarship",
+      "source_id": "S4210233755",
+      "openalex_name": "MAI Journal A New Zealand Journal of Indigenous Scholarship"
+    },
+    {
+      "group": "nais",
+      "query_name": "Settler Colonial Studies",
+      "source_id": "S4210228527",
+      "openalex_name": "Settler Colonial Studies"
+    },
+    {
+      "group": "nais",
+      "query_name": "Wicazo Sa Review",
+      "source_id": "S979866670",
+      "openalex_name": "Wicazo Sa Review"
+    },
+    {
+      "group": "ps",
+      "query_name": "Government Information Quarterly",
+      "source_id": "S201710173",
+      "openalex_name": "Government Information Quarterly"
+    },
+    {
+      "group": "ps",
+      "query_name": "Public Administration Review",
+      "source_id": "S76877748",
+      "openalex_name": "Public Administration Review"
+    },
+    {
+      "group": "ps",
+      "query_name": "Public Management Review",
+      "source_id": "S37623806",
+      "openalex_name": "Public Management Review"
+    },
+    {
+      "group": "ps",
+      "query_name": "Public Administration",
+      "source_id": "S201221823",
+      "openalex_name": "Public Administration"
+    },
+    {
+      "group": "ps",
+      "query_name": "Journal of Public Administration Research and Theory",
+      "source_id": "S169433491",
+      "openalex_name": "Journal of Public Administration Research and Theory"
+    },
+    {
+      "group": "ps",
+      "query_name": "The American Review of Public Administration",
+      "source_id": "S106702950",
+      "openalex_name": "The American Review of Public Administration"
+    },
+    {
+      "group": "ps",
+      "query_name": "International Journal of Public Administration",
+      "source_id": "S39541053",
+      "openalex_name": "International Journal of Public Administration"
+    },
+    {
+      "group": "ps",
+      "query_name": "Regulation & Governance",
+      "source_id": "S108218269",
+      "openalex_name": "Regulation & Governance"
+    },
+    {
+      "group": "ps",
+      "query_name": "VOLUNTAS: International Journal of Voluntary and Nonprofit Organizations",
+      "source_id": "S80347152",
+      "openalex_name": "VOLUNTAS International Journal of Voluntary and Nonprofit Organizations"
+    },
+    {
+      "group": "ps",
+      "query_name": "Policy and Society",
+      "source_id": "S129664799",
+      "openalex_name": "Policy and Society"
+    },
+    {
+      "group": "ps",
+      "query_name": "Review of Public Personnel Administration",
+      "source_id": "S51277951",
+      "openalex_name": "Review of Public Personnel Administration"
+    },
+    {
+      "group": "ps",
+      "query_name": "Policy Studies Journal",
+      "source_id": "S119514724",
+      "openalex_name": "Policy Studies Journal"
+    },
+    {
+      "group": "ps",
+      "query_name": "Journal of Public Budgeting, Accounting & Financial Management",
+      "source_id": "S2912564958",
+      "openalex_name": "Journal of Public Budgeting Accounting & Financial Management"
+    },
+    {
+      "group": "ps",
+      "query_name": "Public Money & Management",
+      "source_id": "S87681011",
+      "openalex_name": "Public Money & Management"
+    },
+    {
+      "group": "ps",
+      "query_name": "Housing Policy Debate",
+      "source_id": "S52853039",
+      "openalex_name": "Housing Policy Debate"
+    },
+    {
+      "group": "ps",
+      "query_name": "Social Policy & Administration",
+      "source_id": "S31120751",
+      "openalex_name": "Social Policy and Administration"
+    },
+    {
+      "group": "ps",
+      "query_name": "International Review of Administrative Sciences",
+      "source_id": "S16140064",
+      "openalex_name": "International Review of Administrative Sciences"
+    },
+    {
+      "group": "ps",
+      "query_name": "Administration & Society",
+      "source_id": "S5465880",
+      "openalex_name": "Administration & Society"
+    },
+    {
+      "group": "ps",
+      "query_name": "Public Performance & Management Review",
+      "source_id": "S136809933",
+      "openalex_name": "Public Performance & Management Review"
+    },
+    {
+      "group": "ps",
+      "query_name": "Governance",
+      "source_id": "S62375027",
+      "openalex_name": "Governance"
+    },
+    {
+      "group": "ep",
+      "query_name": "Energy Economics",
+      "source_id": "S94499970",
+      "openalex_name": "Energy Economics"
+    },
+    {
+      "group": "ep",
+      "query_name": "Energy Policy",
+      "source_id": "S175056054",
+      "openalex_name": "Energy Policy"
+    },
+    {
+      "group": "ep",
+      "query_name": "Energy Research & Social Science",
+      "source_id": "S2764593084",
+      "openalex_name": "Energy Research & Social Science"
+    },
+    {
+      "group": "ep",
+      "query_name": "Environmental Impact Assessment Review",
+      "source_id": "S167829764",
+      "openalex_name": "Environmental Impact Assessment Review"
+    },
+    {
+      "group": "ep",
+      "query_name": "Energy Strategy Reviews",
+      "source_id": "S2764911704",
+      "openalex_name": "Energy Strategy Reviews"
+    },
+    {
+      "group": "ep",
+      "query_name": "Climate Policy",
+      "source_id": "S113876312",
+      "openalex_name": "Climate Policy"
+    },
+    {
+      "group": "ep",
+      "query_name": "Marine Policy",
+      "source_id": "S56205983",
+      "openalex_name": "Marine Policy"
+    },
+    {
+      "group": "ep",
+      "query_name": "Current Opinion in Environmental Sustainability",
+      "source_id": "S153840704",
+      "openalex_name": "Current Opinion in Environmental Sustainability"
+    },
+    {
+      "group": "ep",
+      "query_name": "Journal of Environmental Economics and Management",
+      "source_id": "S200872515",
+      "openalex_name": "Journal of Environmental Economics and Management"
+    },
+    {
+      "group": "ep",
+      "query_name": "Journal of Environmental Planning and Management",
+      "source_id": "S92470662",
+      "openalex_name": "Journal of Environmental Planning and Management"
+    },
+    {
+      "group": "ep",
+      "query_name": "Annual Review of Environment and Resources",
+      "source_id": "S5491134",
+      "openalex_name": "Annual Review of Environment and Resources"
+    },
+    {
+      "group": "ep",
+      "query_name": "Energy & Environment",
+      "source_id": "S184363771",
+      "openalex_name": "Energy & Environment"
+    },
+    {
+      "group": "ep",
+      "query_name": "Climate and Development",
+      "source_id": "S43379938",
+      "openalex_name": "Climate and Development"
+    },
+    {
+      "group": "ep",
+      "query_name": "International Journal of Energy Sector Management",
+      "source_id": "S161018996",
+      "openalex_name": "International Journal of Energy Sector Management"
+    },
+    {
+      "group": "ep",
+      "query_name": "The Electricity Journal",
+      "source_id": "S135262353",
+      "openalex_name": "The Electricity Journal"
+    },
+    {
+      "group": "ep",
+      "query_name": "Energy Efficiency",
+      "source_id": "S133853345",
+      "openalex_name": "Energy Efficiency"
+    },
+    {
+      "group": "ep",
+      "query_name": "Journal of Environmental Policy & Planning",
+      "source_id": "S20798355",
+      "openalex_name": "Journal of Environmental Policy & Planning"
+    },
+    {
+      "group": "ep",
+      "query_name": "Journal of the Association of Environmental and Resource Economists",
+      "source_id": "S2735550652",
+      "openalex_name": "Journal of the Association of Environmental and Resource Economists"
+    },
+    {
+      "group": "ep",
+      "query_name": "Mitigation and Adaptation Strategies for Global Change",
+      "source_id": "S114851709",
+      "openalex_name": "Mitigation and Adaptation Strategies for Global Change"
+    },
+    {
+      "group": "ep",
+      "query_name": "The Energy Journal",
+      "source_id": "S102805530",
+      "openalex_name": "The Energy Journal"
+    },
+    {
+      "group": "nais",
+      "query_name": "Native American and Indigenous Studies",
+      "source_id": "S2764931408",
+      "openalex_name": "Native American and Indigenous Studies"
+    }
+  ],
+  "unmatched": [
+    {
+      "group": "nais",
+      "query_name": "Journal of Indigenous Research",
+      "note": "Not indexed in OpenAlex; incorrectly resolved to S5407050978 (an unrelated Indonesian bilingualism journal)"
+    },
+    {
+      "group": "nais",
+      "query_name": "Native Studies Review",
+      "note": "Not indexed in OpenAlex (ISSN 0831-674X, Univ of Saskatchewan); incorrectly resolved to S979866670 (Wicazo Sa Review), which is already a separate entry"
+    }
+  ]
+}
