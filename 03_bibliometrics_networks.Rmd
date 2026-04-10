@@ -47,22 +47,27 @@ getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
 ```
 
 
-```{r GetData1}
+```{r GetData}
+
+# raw data
 
 works <- readRDS(file = "data/works.rds")
 refs <- readRDS(file = "data/refs.rds")
 
 # edgelist
-el <- readRDS(file = "data/network_edgelist_reduced")
 
+el <- readRDS(file = "data/network_edgelist_reduced")
 
 ```
 
 Step 1)  Create a citation graph following Wood et al. (2025) - code is available in Liza Wood's Github repository "tamar"
         a) start with a full graph
-        b) simplify it 
+        b) simplify it by removing any multiple edges or loop edges - BUT!  WARNING!  Elise says "simplify" is notoriously wonky
 
-```{r create citation graph}
+```{r 1) create citation graph}
+
+# this block is essentially copy-pasted from Liza's code
+  # only difference is I added some annotations
 
 cit_graph <- graph_from_edgelist(as.matrix(el), directed = T)
 
@@ -74,6 +79,8 @@ cit_graph <- graph_from_edgelist(as.matrix(el), directed = T)
 # result is a "Large igraph (69144 elements, 12.4 MB)
 
 cit_graph <- igraph::simplify(cit_graph, remove.multiple = T, remove.loops = T)
+  # remove.multiple	Logical, whether the multiple edges are to be removed
+  # remove.loops	Logical, whether the loop edges are to be removed
 
 # result is a "Large igraph (69144 elements, 5 MB)
 
@@ -81,15 +88,20 @@ cit_graph <- igraph::simplify(cit_graph, remove.multiple = T, remove.loops = T)
 
 
 Step 2) Identify clusters
-        a) Find connected components of the graph
-        b) For those components with a membership size larger than 1 (i.e., connected to at least one other node), create a subgraph
-        c) run clustering algorithm
+        a) Find connected components of the citation graph
+        b) For those components from the main cluster (with 69,041 elements out of 69,144), create subgraph
+        c) run clustering algorithm on the main cluster - start with Louvain
         d) examine modularity
+        e) delve into the clusters
     
 
-```{r a) find connected components}
+```{r 2a) find connected components}
 
-clus <- components(cit_graph)
+# this block is essentially copy-pasted from Liza's code
+  # changed "clu" to "clus"
+  # added some annotations
+
+clus <- components(cit_graph)  # List of 3: $ membership, $ csize, $ no
 
 # result is a "Large list (3 elements, 5.5 MB)
 
@@ -100,91 +112,123 @@ clus <- components(cit_graph)
   # $ csize     : num [1:9]
   # $ no        : num 9
 
-# clus_summary <- clus %>% 
-#   group_by(membership) %>% 
-#  summarise(n = n())
+# --- grouping/summarizing doesn't work --- "
 
-# Error in UseMethod("group_by") : 
-  # no applicable method for 'group_by' applied to an object of class "list"
+    # Error in UseMethod("group_by") : 
+        # no applicable method for 'group_by' applied to an object of class "list"
+
 
 table(clus$membership)
 
 #     1     2     3     4     5     6     7     8     9 
 # 69041     9    11    19    15     9    15    12    13 
 
-connected_component <- names(clus$membership)[clus$membership!=1]
-# str(connected_component)  #  chr [1:103]
+# translation:  there are 9 clusters - 69041 elements are all in 1 cluster
+# meaning, need to compute the communities JUST using the elements in the main cluster
+
+connected_component <- names(clus$membership)[clus$membership == 1]
+
+str(connected_component)  #  chr [1:69041]  
+    # --> which means 103 works were NOT INCLUDED in the main cluster (69144-69041)
+
+unconnecteds <- names(clus$membership)[clus$membership != 1]  #  chr [1:103]
+    # can eventually use this list to find the outliers
+    # as Liza did
 
 ```
 
-```{r b) create subgraph and undirected version}
+```{r 2b) create subgraph and undirected version}
 
 # this block is essentially copy-pasted from Liza's code
+  # changed "clu" to "clus" but no other changes
 
 if(any(clus$membership>1)){
   cit_graph_main <- induced_subgraph(cit_graph,v = which(V(cit_graph)$name %in% connected_component))
-  cit_graph <- cit_graph_main
+  # cit_graph <- cit_graph_main  # Liza recycled the name "cit_graph" but I opted to keep it as "..._main"
 }
 
-cit_graph_ud <- as.undirected(cit_graph, 'collapse')
+cit_graph_ud <- as.undirected(cit_graph_main, 'collapse')
+
 ```
 
-```{r c) run clustering algorithm}
 
-# this block is essentially copy-pasted from Liza's code
+```{r 2c) run clustering algorithm}
 
-set.seed(12) 
+# recall that she had a much higher seed value under certain call conditions
+      # if(LOCATION == 'data/query_EG/' & ADD_SUPPL_WOS_REFS == F){
+        #  pref_seed <- 4812
+        #  } else{
+
+# will try running it with the set.seed set to 12 
+
+ set.seed(12)  # Liza comment: # and 16 got to 8, dropped PES and joined it wit PE
     seeds <- sample.int(9999, 1000)
 
- mod <- list()
+    mod <- list()
     for(i in 1:length(seeds)){
       set.seed(seeds[i])
       louv <- cluster_louvain(cit_graph_ud)
       mod$mod[i] <- modularity(louv)
       mod$min_n[i] <- min(table(louv$membership))
     }
- 
- mods <- unlist(mod$mod)
+    mods <- unlist(mod$mod)
     min_ns <- unlist(mod$min_n)
+    
+# time to run:  ~52 minutes
+# per Elise's guidance, should probably save the rds!
+    
+saveRDS(louv, "Louvain")
+    
+head(mods)  # [1] 0.6961121 0.6974466 0.6971936 0.6956488 0.6984532 0.6987537
+tail(mods)  # [1] 0.6989354 0.6966139 0.6955635 0.6962756 0.6958860 0.6961305
+
 
 ```
 
-```{r d) examine modularity}
+```{r 2d) examine modularity and degrees}
+
 pref_seed <- seeds[which(mods == max(mods))]
 
-set.seed(pref_seed) # 4262 with min size of 80, 2925 with min size of 30
-louv <- cluster_louvain(cit_graph_ud)
-V(cit_graph)$louv_cluster <- louv$membership
-
-# when I try to view "louv" - get an error message:
-# Error in names[[i]] : subscript out of bounds
+set.seed(pref_seed)  # Liza comment:  # 4262 with min size of 80, 2925 with min size of 30
+louv <- readRDS(file = "data/Louvain")
+V(cit_graph_main)$louv_cluster <- louv$membership
 
 # modularity measure
+
 modularity(louv)
-B = modularity_matrix(cit_graph)
+B = modularity_matrix(cit_graph_main)
 
-summary(degree(cit_graph,mode = 'out'))
-  # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-  # 0.00    0.00    1.00    1.35    1.00   13.00
+    # Error in modularity_matrix(cit_graph_main) :
+        # At vendor/cigraph/src/core/vector.pmt:475 : Cannot reserve space for vector. Out of memory
 
-summary(degree(cit_graph,mode = 'in'))
+# out-degree, in-degree, total-degree 
+
+summary(degree(cit_graph_main,mode = 'out'))
+  # Min.    1st Qu.  Median    Mean 3rd Qu.    Max. 
+  # 0.000   1.000   4.000   6.673  10.000   190.000
+
+summary(degree(cit_graph_main,mode = 'in'))
+  #  Min.   1st Qu.  Median    Mean 3rd Qu.    Max. 
+  #  0.000   0.000   1.000   6.673   7.000   791.000
+
+summary(degree(cit_graph_main, mode = "all"))
   #  Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-  #  0.00    0.00    1.00    1.35    1.00   12.00
-
-summary(degree(cit_graph))
-  #  Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-  # 1.000   1.000   1.000   2.699   1.000  24.000
+  # 1.00    2.00    6.00   13.35   18.00    796.00
 
 # Add network summary
 table(louv$membership)
-mean(table(louv$membership))
-median(table(louv$membership))
-min(table(louv$membership))  # [1] 9
-max(table(louv$membership))  # [1] 19
+mean(table(louv$membership))  # [1] 3138.227
+median(table(louv$membership))  # [1] 1482.5
+min(table(louv$membership))  # [1] 10
+max(table(louv$membership))  # [1] 14097
 
 ```
 
-```{r d) cluster descriptions}
+
+
+```{r e) cluster descriptions}
+
+# not sure "page_rank" is the best approach
 
 prank <- page_rank(cit_graph)
 V(cit_graph)$prank <- unlist(as.vector(prank$vector))
@@ -208,3 +252,33 @@ V(cit_graph)$highest_in_group <- V(cit_graph)$name %in% max_by_group$node
 saveRDS(cit_graph, paste0(path_location,'cit_graph.rds'))
 
 ```
+
+
+
+--- Old notes ---, 
+when the louvain clustering algorithm did NOT work correctly, 
+and when I totally misunderstood what the "clus" table was telling me...
+
+Want to go back at this point and see if setting up the connnected components like Liza did makes a difference.  Her approach was to construct the "connected_components" with values equal to 1,then do the same "if > 1" to make the subgraph.  
+
+Given that she linked her "connected_components" with the metadata to get the titles of those with membership == 1, she might have set up her "connected components" in this way because she had a lot fewer components with only 1 edge.  However, in the NAIS-PS data the majority have a membership of 1:
+
+    #     1     2     3     4     5     6     7     8     9 
+    # 69041     9    11    19    15     9    15    12    13 
+    
+
+After re-doing steps 2a-b using her approach (see below), the objects produced have the same dimensions and same head() and tail() values as those objects I produced using my approach.  
+
+And the "louv" communities object seems broken - might have been because I had made it using the outlying clusters instead of the main cluster.  
+
+  - when I try to view "louv" - get an error message:
+      
+        # Error in names[[i]] : subscript out of bounds
+        
+   - Global environment:  "louv" is a List of 8
+   - can't view it
+   - CAN see six variables when I click on the drop-down (but shouldn't it be 8?)
+   - louv[[1]] - gives me 9 work_id values ... louv[[2]] give me 11 values ...
+   - in other words, the number of work_id values provided when calling each column matches the number in the membership summary table (see above) 
+
+

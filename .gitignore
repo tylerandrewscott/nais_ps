@@ -45,5 +45,12 @@ docs/
 # translation temp files
 po/*~
 
+# old data
+bibliometrics_mrj.Rmd
+data_old/*
+data_output/to_ignore/*
+data_oops
+data_output/SocSci_subfields.csv
+
 # RStudio Connect folder
 rsconnect/
