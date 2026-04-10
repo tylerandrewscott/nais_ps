@@ -19,3 +19,17 @@ readRDS(file = refs)  # Error: object 'refs' not found
 
 
 readRDS(nais_ps/data/works.rds)  # Error: object 'nais_ps' not found
+
+works <- readRDS(file = "data/works.rds")
+
+head(works)
+str(works)
+typeof(works)
+class(works)
+
+refs <- readRDS(file = "data/refs.rds")
+
+library(tidyverse)
+
+works %>% 
+  summarise(.by = language, n())

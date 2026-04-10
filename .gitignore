@@ -47,6 +47,9 @@ po/*~
 
 # old data
 bibliometrics_mrj.Rmd
+biblimetrics_mrj.html
+code_drafts_mrj/bibliometrics_mrj.R
+code_drafts_mrj/bibliometrics_mrj.html
 data_old/*
 data_output/to_ignore/*
 data_oops
