@@ -45,8 +45,10 @@ refs <- readRDS(file = "data/refs.rds")
 ```
 
 
-[UPDATE:  4/24/2026]
-Changed tactic - realized that finding the "overlapping" references probably misses references to older works, so generated the list of UNIQUE references from both columns of "refs" (in Step 6) and then further filtered the "works" to just those unique refs (in Step 7).  
+[UPDATE:  4/24-27/2026]
+Changed tactic - realized that finding the "overlapping" references probably misses references to older works, so generated the list of UNIQUE references from both columns of "refs" (in Step 6) and then further filtered the "works" to just those unique refs (in Step 7).  Created a new nodelist from this filtered works list of just those unique "refs".  Added an update to Step 8, which I might revisit in the future.  Edited the commentary for Step 9 because I added terms to the str_detect.  Then created a new nodelist in Step 10.  
+
+----------------------
 
 Step 1)  filter the "works" rds by:
   - language (keep only those works in English)
@@ -124,6 +126,8 @@ nrow(refs_cited_only_v2) + nrow(refs_citing_only_v2)  # [1] 76506
 refs_filt_unique <- bind_rows(refs_citing_only_v2, refs_cited_only_v2) %>% 
   unique()
 
+n_distinct(refs_filt_unique)  # [1] 56551
+
 ```
 
 
@@ -156,28 +160,71 @@ saveRDS(filt_unique_works, "network_nodelist")
 
 Step 8) Considered filtering based on the different "primary_topic*" variables.  Did so both before and after I used %in% to limit the works to just those appearing in the overlapping reference list.  [see code in "02b" for exploration of these variables].  Ultimately decided NOT to filter on this topic for overall analysis, but could see diving deeper into some of the primary topic fields. 
 
-[UPDATE]  
+[UPDATE]  Might HAVE to filter it down to just either "Social Sciences" and/or "Environmental Science" in order to derive a network/clusters that I can actually analyze.  
 
-Step 9) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the overlapping list of references, there are 56 observations that have "Indigenous|indigenous|tribal|tribe|Tribe|Native") in either the title or primary topic field - which equates to 0.28% of the works.  (In the full list of filtered references, including those not found in the overlapping references, there are 2860 observations - which equates to 2.8%.)  [see code in "02b" for exploration of this occurrence] 
+Step 9) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the unique list of references, there are 482 observations that have "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") in either the title or primary topic field - which equates to 0.88% of the works.  (In the full list of filtered references, including those not found in the overlapping references, there are 2860 observations - which equates to 2.8%.)  [see code in "02b" for exploration of this occurrence] 
 
 Step 10) Having created the node list for the network analysis, need to also create the edge list.
 
 ```{r Creating the edgelist}
 
-network_edgelist_full <- refs %>% 
-  filter(citing_id %in% refs_citing_only$from | 
-           cited_id %in% refs_cited_only$to)
-
-network_edgelist_overlap1 <- refs %>% 
-  filter(citing_id %in% filt_overlap_works$work_id | 
-                       cited_id %in% filt_overlap_works$work_id)
-
-# n = 460956
+nrow(refs)  # [1] 634527
 
 # remove self references
 
-network_edgelist_overlap2 <-network_edgelist_overlap1[citing_id != cited_id]
+refs_noselfs <- refs[citing_id != cited_id]
+nrow(refs_noselfs)  # [1] 634058 - so, it removed 469 rows
 
-saveRDS(network_edgelist_overlap2, "network_edgelist_reduced")
+# remove loops - per Liza's code:
+  # these shouldn't really be possible
+  # unless published in the same issue? And just a few more
+  # e.g. A -> B and B -> A
+
+el2 <- refs_noselfs %>% 
+  select(from = citing_id, to = cited_id)
+
+
+while(any(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))){
+  for(i in which(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))){
+    el2 <- el2[-i,]
+  }
+}
+
+# OK, this for-loop is taking forever (gave up at 50 minutes)
+# another approach: 
+  # add a column that will contain a row ID that doesn't change
+  # ID those rows for which A = B and B = A
+  # filter out those rows
+
+  # OR just add a binary column indicated if the "which" statement is true, 
+  # then filter on that column
+
+# refs_num <- refs_noselfs %>% 
+ # mutate(r_id = c(1:nrow(refs_noselfs)))
+
+# refs_reduced <- refs_noselfs %>% 
+ # select(from = citing_id, to = cited_id) %>% 
+ # mutate(loop = which(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))) %>% 
+ # filter(loop)
+
+# above code (through the mutate row) gave an error message:  
+  # `loop` must be size 634058 or 1, not 5636
+
+# Elise's recommendation:
+  # use the "which" statement from Liza's for-loop to create an "index"
+  # el2 <- el2[!index,]
+
+loop_index <- which(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))
+
+refs_reduced <- el2[!loop_index,]
+
+# checks if this approach worked:
+  # length(loop_index)  # [1] 5636
+  # nrow(refs_reduced)  # [1] 628422
+  # nrow(el2) - length(loop_index)  # [1] 628422 - IT WORKED!!
+
+network_edgelist_v2 <-refs_reduced
+
+saveRDS(network_edgelist_v2, "edgelist_reduced_v2")
 
 ```
