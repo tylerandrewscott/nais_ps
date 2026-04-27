@@ -48,9 +48,9 @@ refs <- readRDS(file = "data/refs.rds")
 [UPDATE:  4/24/2026]
 Changed tactic - realized that finding the "overlapping" references probably misses references to older works, so went back into "02" and generated the list of UNIQUE references from both columns of "refs".  In item 3 below (and the corresponding code chunk), I've documented my logic and how I found those works from the "refs_filt_unique" that do NOT appear in the dataframe once I filter the works down to just those works that appear in the "unique" refs list.
 
-I also edited Step 4 to investigate the primary topic fields and subfields of the new "works" df.
+I also edited Step 4 to investigate the primary topic fields of the new "works" df.  I did NOT look at the new subfield distribution as of 4/26/2026.
 
-I have NOT edited any of the commentary or code from BEFORE or AFTER item 3.
+I have NOT edited any of the commentary or code from BEFORE item 3 or AFTER item 4.
 
 
 
@@ -218,11 +218,11 @@ tally_by_primary_field <- filt_works %>%
   mutate(n_subfields = n_distinct(primary_topic_subfield)) %>% 
   mutate(n_topics = n_distinct(primary_topic)) %>% 
   select(primary_topic_field, n_subfields, n_topics) %>% 
-  distinct(primary_topic_field, .keep_all = TRUE) # %>% 
+  distinct(primary_topic_field, .keep_all = TRUE)  # %>% 
   # arrange(desc(n))
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name_fields <- "Subfields_Topics.csv"
+file_name_fields <- "Subfields_Topics_v2.csv"
 full_output_path_fields <- file.path(output_directory, file_name_fields)
 
 write_excel_csv(tally_by_primary_field, file = full_output_path_fields)
@@ -273,11 +273,12 @@ n_distinct(filt_unique_works$primary_topic[filt_unique_works$primary_topic_field
 unique_by_primary_field <- filt_unique_works %>% 
   group_by(primary_topic_field) %>%
   # summarise(n = n()) %>% 
+  # arrange()
   mutate(n_subfields = n_distinct(primary_topic_subfield)) %>% 
   mutate(n_topics = n_distinct(primary_topic)) %>% 
   select(primary_topic_field, n_subfields, n_topics) %>% 
-  distinct(primary_topic_field, .keep_all = TRUE) # %>% 
-  # arrange(desc(n))
+  distinct(primary_topic_field, .keep_all = TRUE) %>% 
+  arrange()
   
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
@@ -359,7 +360,8 @@ It might be interesting to take a much closer look at teh 56 articles from the f
   # space between the different calls is OK - BUT! - 
   # do NOT include a space between the different terms of each "str_detect" call
 
-indig_title_topic_or <- filt_overlap_works %>% 
+indig_title_topic_or_unique <- filt_unique_works %>% 
+  # filter(str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%  
   filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native") | 
            str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%
   group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
@@ -370,23 +372,23 @@ indig_title_topic_or <- filt_overlap_works %>%
 # use the code above, but only before the "group_by"
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name_indig <- "Overlap_Indigenous.csv"
+file_name_indig <- "Unique_Indigenous.csv"
 full_output_path_fields <- file.path(output_directory, file_name_indig)
 
-write_excel_csv(indig_title_topic_or, file = full_output_path_fields)
+write_excel_csv(indig_title_topic_or_unique, file = full_output_path_fields)
 
 # to get the actual subset of just those articles that have Indigenous-specific language
 # in either the title or the primary topic
 
-indig_works <- filt_overlap_works %>% 
+indig_works_unique <- filt_unique_works %>% 
   filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native") | 
            str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native"))
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name_indig_works <- "Indigenous_works.csv"
+file_name_indig_works <- "Indigenous_works_unique.csv"
 full_output_path_fields <- file.path(output_directory, file_name_indig_works)
 
-write_excel_csv(indig_works, file = full_output_path_fields)
+write_excel_csv(indig_works_unique, file = full_output_path_fields)
 
 # ---------------
 # just need the above code
