@@ -360,10 +360,10 @@ It might be interesting to take a much closer look at teh 56 articles from the f
   # space between the different calls is OK - BUT! - 
   # do NOT include a space between the different terms of each "str_detect" call
 
-indig_title_topic_or_unique <- filt_unique_works %>% 
-  # filter(str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%  
-  filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native") | 
-           str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native")) %>%
+indig_title_topic_or <- filt_works %>% 
+  # filter(str_detect(primary_topic, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native")) %>%  
+  filter(str_detect(title, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") | 
+           str_detect(primary_topic, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native")) %>%
   group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
   summarise(n_Indig = n())
 
@@ -372,17 +372,17 @@ indig_title_topic_or_unique <- filt_unique_works %>%
 # use the code above, but only before the "group_by"
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name_indig <- "Unique_Indigenous.csv"
+file_name_indig <- "Indigenous_pre.csv"
 full_output_path_fields <- file.path(output_directory, file_name_indig)
 
-write_excel_csv(indig_title_topic_or_unique, file = full_output_path_fields)
+write_excel_csv(indig_title_topic_or, file = full_output_path_fields)
 
 # to get the actual subset of just those articles that have Indigenous-specific language
 # in either the title or the primary topic
 
 indig_works_unique <- filt_unique_works %>% 
-  filter(str_detect(title, "Indigenous|indigenous|tribal|tribe|Tribe|Native") | 
-           str_detect(primary_topic, "Indigenous|indigenous|tribal|tribe|Tribe|Native"))
+  filter(str_detect(title, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") | 
+           str_detect(primary_topic, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native"))
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
 file_name_indig_works <- "Indigenous_works_unique.csv"
