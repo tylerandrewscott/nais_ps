@@ -105,12 +105,17 @@ refs_citing_only <- refs %>%
   count(citing_id, sort = TRUE, name = "tally") %>% 
   filter(tally >= 5) %>% 
   select(-tally, from = citing_id)
+
+n_distinct(refs_citing_only)  # [1] 43482
   
 refs_cited_only <- refs %>% 
   count(cited_id, sort = TRUE, name = "tally") %>% 
   filter(tally >= 5) %>% 
   select(-tally, to = cited_id)
 
+n_distinct(refs_cited_only)  # [1] 33024
+
+nrow(refs_cited_only) + nrow(refs_citing_only)  # [1] 76506
 
 refs_filt_overlap <- refs_citing_only %>% 
   filter(from %in% refs_cited_only$to) %>% 

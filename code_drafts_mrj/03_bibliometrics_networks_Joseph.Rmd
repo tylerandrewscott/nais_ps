@@ -92,7 +92,7 @@ Step 2) Identify clusters
         b) For those components from the main cluster (with 69,041 elements out of 69,144), create subgraph
         c) run clustering algorithm on the main cluster - start with Louvain
         d) examine modularity
-        e) delve into the clusters
+        e) examine Page Rank estimates of citation importance
     
 
 ```{r 2a) find connected components}
@@ -154,20 +154,26 @@ cit_graph_ud <- as.undirected(cit_graph_main, 'collapse')
 
 ```{r 2c) run clustering algorithm}
 
+# this block is essentially copy-pasted from Liza's code
+
 # recall that she had a much higher seed value under certain call conditions
       # if(LOCATION == 'data/query_EG/' & ADD_SUPPL_WOS_REFS == F){
         #  pref_seed <- 4812
         #  } else{
 
 # will try running it with the set.seed set to 12 
-
+ # seed a pseudo random numb er generator using a reproducible seed 
+ # why do we need this?
  set.seed(12)  # Liza comment: # and 16 got to 8, dropped PES and joined it wit PE
+    # select 1000 numbers with equal weighting from the set 0:9999
     seeds <- sample.int(9999, 1000)
+    print(seeds)
 
     mod <- list()
     for(i in 1:length(seeds)){
       set.seed(seeds[i])
-      louv <- cluster_louvain(cit_graph_ud)
+      # why in for loop? No affected by iteration, move to outside of loop for efficiency
+      # louv <- cluster_louvain(cit_graph_ud)
       mod$mod[i] <- modularity(louv)
       mod$min_n[i] <- min(table(louv$membership))
     }
@@ -178,6 +184,7 @@ cit_graph_ud <- as.undirected(cit_graph_main, 'collapse')
 # per Elise's guidance, should probably save the rds!
     
 saveRDS(louv, "Louvain")
+louv <- readRDS(file = "data/Louvain")
     
 head(mods)  # [1] 0.6961121 0.6974466 0.6971936 0.6956488 0.6984532 0.6987537
 tail(mods)  # [1] 0.6989354 0.6966139 0.6955635 0.6962756 0.6958860 0.6961305
@@ -186,6 +193,8 @@ tail(mods)  # [1] 0.6989354 0.6966139 0.6955635 0.6962756 0.6958860 0.6961305
 ```
 
 ```{r 2d) examine modularity and degrees}
+
+# this block is essentially copy-pasted from Liza's code
 
 pref_seed <- seeds[which(mods == max(mods))]
 
@@ -226,9 +235,7 @@ max(table(louv$membership))  # [1] 14097
 
 
 
-```{r e) cluster descriptions}
-
-# not sure "page_rank" is the best approach
+```{r e) PageRank measure of citation importance}
 
 prank <- page_rank(cit_graph)
 V(cit_graph)$prank <- unlist(as.vector(prank$vector))
@@ -255,9 +262,9 @@ saveRDS(cit_graph, paste0(path_location,'cit_graph.rds'))
 
 
 
---- Old notes ---, 
-when the louvain clustering algorithm did NOT work correctly, 
-and when I totally misunderstood what the "clus" table was telling me...
+--- Old notes --- 
+(from when the louvain clustering algorithm did NOT work correctly, 
+and when I totally misunderstood what the "clus" table was telling me...)
 
 Want to go back at this point and see if setting up the connnected components like Liza did makes a difference.  Her approach was to construct the "connected_components" with values equal to 1,then do the same "if > 1" to make the subgraph.  
 
