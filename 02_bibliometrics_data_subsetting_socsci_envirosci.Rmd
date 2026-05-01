@@ -151,23 +151,9 @@ saveRDS(works_filt_unique, "works_filtered_unique")
 ```
 
 
-Step 8) Considered filtering based on the different "primary_topic*" variables.  Did so both before and after I used %in% to limit the works to just those appearing in the overlapping reference list.  [see code in "02b" for exploration of these variables].  Ultimately decided NOT to filter on this topic for overall analysis, but could see diving deeper into some of the primary topic fields. 
+Step 8) Having created the node list for the network analysis, need to also create the edge list.
 
-[UPDATE: 4/28/2026  Might HAVE to filter it down to just either "Social Sciences" and/or "Environmental Science" in order to derive a network/clusters that I can actually analyze.] 
-
-
-```{r 8) getting just the social science and environmental science works and refs}
-
-
-
-```
-
-
-Step 9) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the unique list of references, there are 482 observations that have "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") in either the title or primary topic field - which equates to 0.88% of the works.  (In the full list of filtered references, including those not found in the overlapping references, there are 2860 observations - which equates to 2.8%.)  [see code in "02b" for exploration of this occurrence] 
-
-Step 10) Having created the node list for the network analysis, need to also create the edge list.
-
-```{r Creating the edgelist}
+```{r 8) Creating the edgelist}
 
 nrow(refs)  # [1] 634527
 
@@ -184,36 +170,11 @@ nrow(refs_noselfs)  # [1] 634058 - so, it removed 469 rows
 el2 <- refs_noselfs %>% 
   select(from = citing_id, to = cited_id)
 
-
-while(any(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))){
-  for(i in which(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))){
-    el2 <- el2[-i,]
-  }
-}
-
-# OK, this for-loop is taking forever (gave up at 50 minutes)
-# another approach: 
-  # add a column that will contain a row ID that doesn't change
-  # ID those rows for which A = B and B = A
-  # filter out those rows
-
-  # OR just add a binary column indicated if the "which" statement is true, 
-  # then filter on that column
-
-# refs_num <- refs_noselfs %>% 
- # mutate(r_id = c(1:nrow(refs_noselfs)))
-
-# refs_reduced <- refs_noselfs %>% 
- # select(from = citing_id, to = cited_id) %>% 
- # mutate(loop = which(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))) %>% 
- # filter(loop)
-
-# above code (through the mutate row) gave an error message:  
-  # `loop` must be size 634058 or 1, not 5636
-
+# Liza used a for-loop, but it is taking forever (gave up at 50 minutes)
 # Elise's recommendation:
   # use the "which" statement from Liza's for-loop to create an "index"
-  # el2 <- el2[!index,]
+  # el2 <- el2[!index,] 
+  # filter out those rows all at once
 
 loop_index <- which(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))
 
@@ -229,6 +190,78 @@ network_edgelist_v2 <-refs_reduced
 saveRDS(network_edgelist_v2, "edgelist_reduced_v2")
 
 ```
+
+
+Step 9) Given the size of the community clusters generated using the "full" edgelist (the 'refs narrowed down to match the filtered 'works'), I want to filter both to just examine the works that have a "primary_topic_field" value of "Social Sciences" and/or "Environmental Science" in order to derive a network/clusters that I can actually analyze.  
+
+Starting the 'works' object:  I wanted to do these separately but also together.  Because the "work_id" has a 1:1 link with "primary_topic_field" (meaning, each work_id can only have 1 value of the primary_topic_field), summing the number of I get from filtering by each individual field should equal the number I get when I filter using either/or - which it does.
+
+BUT, when I go to use these as inputs for filtering down the 'refs' object - the math doesn't work out the same.
+  - I use %in% to find the "from" refs OR the "to" refs in the "work_id" of the 'works' object
+  - but b/c a work "from" - say - the social science field might be referencing a work from another field
+  - the "from" | "to" filters on the individually run topic fields won't match the same call on the combined 'works'
+  - but if I use &, then I'm only going to get observations for which BOTH the from and to are part of the 'works'
+  - meaning, I won't know if there are connection to other fields or not
+  
+BUT - maybe I'm not interpreting that correctly...maybe filtering using the "&" doesn't mean both the "from" and "to" for any given row have to be in the 'works' object - so, does "filter" work row-wise or column-wise??
+  
+So, next steps: stick with one primary_topic field
+
+
+```{r 9) getting just the social science and environmental science works and refs}
+
+# will filter the 'works' 3x:  1x each for soc_sci and enviro_sci and 1x combined
+
+works_soc_sci <- works_filt_unique %>% 
+  filter(primary_topic_field == "Social Sciences")
+
+works_enviro_sci <- works_filt_unique %>% 
+  filter(primary_topic_field == "Environmental Science")
+
+works_soc_enviro_sci <- works_filt_unique %>% 
+  filter((primary_topic_field == "Social Sciences") | (primary_topic_field == "Environmental Science"))
+
+(nrow(works_soc_sci) + nrow(works_enviro_sci)) == nrow(works_soc_enviro_sci)  # [1] TRUE - It worked!
+
+# now will limit the refs (reduced) to just those works
+
+refs_soc_sci <- refs_reduced %>% 
+  filter((from %in% works_soc_sci$work_id) & (to %in% works_soc_sci$work_id))  # [1] 261716 "or" // [1] 133577 "and"
+
+refs_enviro_sci <- refs_reduced %>% 
+  filter((from %in% works_enviro_sci$work_id) & (to %in% works_enviro_sci$work_id))  # [1] 141232 "or" // [1] 53607 "and"
+
+# to use the 'works' object that had been filtered using BOTH fields
+# I first started with "or" then also tried "and" - see commentary 
+
+# refs_soc_enviro_sci <- refs_reduced %>% 
+ #  filter((from %in% works_soc_enviro_sci$work_id) | (to %in% works_soc_enviro_sci$work_id))  # [1] 383618
+
+refs_soc_enviro_sci <- refs_reduced %>% 
+  filter((from %in% works_soc_enviro_sci$work_id) & (to %in% works_soc_enviro_sci$work_id))  # [1] 206514
+
+(nrow(refs_soc_sci) + nrow(refs_enviro_sci)) == nrow(refs_soc_enviro_sci)  # [1] FALSE
+  
+nrow(refs_soc_sci) + nrow(refs_enviro_sci)  # [1] 402948 "or" // [1] 187184 "and"
+nrow(refs_soc_enviro_sci)  # [1] 383618 if "or" // [1] 206514 if "and"
+
+n_distinct(refs_soc_sci$from)  # [1] 37532
+n_distinct(refs_soc_sci$to)  # [1] 33750
+n_distinct(refs_enviro_sci$from)  # [1] 28753
+n_distinct(refs_enviro_sci$to)  # [1] 26639
+
+n_distinct(refs_soc_sci$from) + n_distinct(refs_enviro_sci$from)  # [1] 66285
+n_distinct(refs_soc_sci$to) + n_distinct(refs_enviro_sci$to)  # [1] 60389
+
+n_distinct(refs_soc_enviro_sci$from)  # [1] 24185
+n_distinct(refs_soc_enviro_sci$to)  # [1] 21782
+
+```
+
+
+Step 10) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the unique list of references, there are 482 observations that have "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") in either the title or primary topic field - which equates to 0.88% of the works.  (In the full list of filtered references, including those not found in the overlapping references, there are 2860 observations - which equates to 2.8%.)  [see code in "02b" for exploration of this occurrence] 
+
+
 
 
 ```{r code for writing csvs}

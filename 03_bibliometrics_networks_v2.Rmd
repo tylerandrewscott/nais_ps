@@ -14,9 +14,11 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```{r libraries}
 # install.packages("pbapply")
 # install.packages("slam")
+# install.packages("ggraph")
 
 library(data.table)
 library(ggplot2)
+library(ggraph)
 library(igraph)
 library(knitr)
 library(Matrix)
@@ -137,8 +139,18 @@ str(connected_component)  #  [1:92503]
     # --> which means 1729 works were NOT INCLUDED in the main cluster (94232-92503)
 
 unconnecteds <- names(clus$membership)[clus$membership != 1]  #  chr [1:1729]
-    # can eventually use this list to find the outliers
+    # can eventually use this list to find the "outliers"
     # as Liza did
+
+
+ggraph(cit_graph, layout = "fr") +
+geom_edge_fan(
+end_cap = circle(1, "mm"),
+color = "#000000",
+width = 0.3,
+arrow = arrow(angle = 15, length = unit(0.07, "inches"), ends = "last", type = "closed"))+
+geom_node_point(alpha = 0.2) +
+labs(title = "Example Network Plot") + theme_void()
 
 ```
 
@@ -175,6 +187,7 @@ set.seed(12)  # Liza comment: # and 16 got to 8, dropped PES and joined it with 
 seeds <- sample.int(9999, 1000)
 
 louv_take3 <- cluster_louvain(cit_graph_ud)
+modularity(louv_take3)
 saveRDS(louv_take3, "Louvain_full")
 # louv <- readRDS(file = "data/Louvain_full")
 
@@ -183,9 +196,9 @@ for(i in 1:length(seeds)){
   set.seed(seeds[i])
       # why is the clustering algo in the for-loop? 
       # Not affected by iteration, move to outside of loop for efficiency
-      # louv <- cluster_louvain(cit_graph_ud)
-  mod$mod[i] <- modularity(louv_take3)
-  mod$min_n[i] <- min(table(louv_take3$membership))
+  louv <- cluster_louvain(cit_graph_ud)
+  mod$mod[i] <- modularity(louv)
+  mod$min_n[i] <- min(table(louv$membership))
 }
 mods <- unlist(mod$mod)
 min_ns <- unlist(mod$min_n)

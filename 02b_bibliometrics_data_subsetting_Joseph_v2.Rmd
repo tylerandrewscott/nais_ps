@@ -42,10 +42,10 @@ getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
 works <- readRDS(file = "data/works.rds")
 refs <- readRDS(file = "data/refs.rds")
 
-works_filt <- readRDS(file = "data/works_filtered.rds")
-refs_unique <- readRDS(file = "data/refs_unique.rds")
+works_filt <- readRDS(file = "data/works_filtered")
+refs_unique <- readRDS(file = "data/refs_unique")
 
-works_filt_unique <- readRDS(file = "data/works_filtered_unique.rds")
+works_filt_unique <- readRDS(file = "data/works_filtered_unique")
 
 ```
 
@@ -64,15 +64,18 @@ The data subsetting step of this project was an iterative process.  After initia
 1) NA values for either the primary topic or fwci - I then filtered the "filt_works" object based on this exploration 
 
 
-```{r Data Exploration - "works_filt" - NA removal} 
+```{r 1) Data Exploration - "works_filt" - NA removal} 
 
-print(count(works_filt, is.na(title)))  # 1:        FALSE 142103 -- as in, all of them, so no NA values
+print(count(works_filt, is.na(title)))  # 1:  FALSE 142316 -- as in, all of them, so no NA values
+print(count(works_filt, title == ""))  # 2:   TRUE 213 -- these need to be removed
 
-print(count(works_filt, is.na(fwci)))  # 2:        TRUE  10694
-print(count(works_filt, is.na(primary_topic)))  # 2: TRUE   10680  
-print(count(works_filt, is.na(primary_topic_subfield)))  # 2: TRUE   10680
-print(count(works_filt, is.na(primary_topic_field)))  # 2: TRUE   10680
-print(count(works_filt, is.na(primary_topic_domain)))  # 2: TRUE   10680
+# after removing them, both lines above produce:  1        FALSE 142103 (so it worked)
+
+print(count(works_filt, is.na(fwci)))  # 2:   TRUE  10694 (pre removing them), FALSE 131409 (after)
+print(count(works_filt, is.na(primary_topic)))  # 2: TRUE   10680 (pre removing them)...
+print(count(works_filt, is.na(primary_topic_subfield)))  # 2: TRUE   10680 (pre removing them)...
+print(count(works_filt, is.na(primary_topic_field)))  # 2: TRUE   10680 (pre removing them)...
+print(count(works_filt, is.na(primary_topic_domain)))  # 2: TRUE   10680 (pre removing them)...
 
 #  after filtering out the NA values for "primary_topic" - all the "primary_topic_..." variables have no NA values
 # and "fwci" only has 14 values, so I'll filter those out 
@@ -84,15 +87,22 @@ print(count(works_filt, is.na(primary_topic_domain)))  # 2: TRUE   10680
 2) Works with 0 values for "referenced_works_count" - I then filtered the "filt_works" object based on this exploration
 
 
-```{r Data Exploration - "works_filt" - works with no references }
+```{r 2) Data Exploration - "works_filt" - works with no references }
 
-print(min(works_filt$referenced_works_count))
+print(min(works_filt$referenced_works_count))  # [1] 0 (pre removing them), [1] 1 (after removing)
 print(count(works_filt, referenced_works_count == 0))
 
     # referenced_works_count == 0      n
                             # <lgcl>  <int>
     # 1:                       FALSE 103075
     # 2:                        TRUE  28334  
+
+
+# will remove the ones with no refs 
+# want to know how they're provenance
+    # which source group did they come from?
+    # which journals did they come from?
+    # are they likely to appear in the "refs" - check OA...?
 
 count_no_refs <- as.integer(count(works_filt[referenced_works_count == 0]))  
 
@@ -163,7 +173,7 @@ This step used %in% to select just those observations in the the "works_filt" ob
 (Prior to using the %in% approach for this step, I tested the different types of joins to see if either of them seemed like a better option.  That code is in the "02_bibliometrics_data_subsetting_tests" rmd.)
 
 
-```{r need to find the 1634 citations from the unique references that aren't in the filtered works}
+```{r 3) Verifying the works-refs intersection}
 
 refs_to_join <- refs_unique %>% 
   select(work_id = citation)
@@ -201,30 +211,47 @@ write_excel_csv(refs_not_in_works, file = full_output_path)
 
 4) I considered filtering out rows based on primary topic information
 
-I did this both before and after I intersected the "filt_works" with the "refs_filt_unique".  The results were either copied and pasted into Excel or exported as a csv and copied into a spreadsheet ("Bilbiometrics_R_to_Excel").  
+I did this both before and after I intersected the "works_filt" with the "refs_unique".  The results were either copied and pasted into Excel or exported as a csv and copied into a spreadsheet ("Bilbiometrics_R_to_Excel").  
 
 
-```{r investigating the "primary topic" variables of the filtered works}
+```{r 4a) Exploring the "primary topic" variables of filtered +/- unique works}
 
-# tally_primary_topic_field_filtered <- count(filt_works, primary_topic_field, sort = TRUE, name = "tally")
-# str(tally_primary_topic_field_filtered)  # Classes ‘data.table’ and 'data.frame':	26 obs. of  2 variables
+# First: Looking at the distribution of the primary_topic variables before narrowing it down by "unique"
 
 n_distinct(works_filt$primary_topic)  # [1] 2075
 n_distinct(works_filt$primary_topic_domain)  # [1] 4
 n_distinct(works_filt$primary_topic_field)  # [1] 26
 n_distinct(works_filt$primary_topic_subfield)  # [1] 199
 
-n_distinct(works_filt$primary_topic_subfield[works_filt$primary_topic_field == "Social Sciences"])  # [1] 21 
-n_distinct(works_filt$primary_topic[works_filt$primary_topic_field == "Social Sciences"])  # [1] 535
+# a deeper dive into the "primary_topic_field" is worth it at this point
+# future effort might be to analyze the topics themselves
 
+tally_primary_topic_field_filtered <- 
+  count(works_filt, primary_topic_field, sort = TRUE, name = "tally")
+# str(tally_primary_topic_field_filtered)  # Classes ‘data.table’ and 'data.frame':	26 obs. of  2 variables
+
+
+# Next: Looking at the distribution of the primary_topic variables after narrowing it down by "unique"
+
+n_distinct(works_filt_unique$primary_topic)  # [1] 1093
+n_distinct(works_filt_unique$primary_topic_domain)  # [1] 4
+n_distinct(works_filt_unique$primary_topic_field)  # [1] 25
+n_distinct(works_filt_unique$primary_topic_subfield)  # [1] 144
+
+tally_primary_topic_field_unique <- 
+  count(works_filt_unique, primary_topic_field, sort = TRUE, name = "tally")
+
+```
+
+```{r junk?}
 # to get results from below into Excel:
     # 1) use the "summarise" to get the full tally - copy to excel
     # 2) comment out the summarize then run the rest of the operations - copy to excel
 
-tally_by_primary_field <- works_filt %>% 
+tally_subfields <- works_filt %>% 
   group_by(primary_topic_field) %>%
   # summarise(n = n())
-  # arrange(desc(n))  # only use this with the "summarize"
+  # arrange(desc(n))  # this doesn't work:  " 'x'must be a vector, not a function.
   mutate(n_subfields = n_distinct(primary_topic_subfield)) %>% 
   mutate(n_topics = n_distinct(primary_topic)) %>% 
   select(primary_topic_field, n_subfields, n_topics) %>% 
@@ -234,12 +261,94 @@ output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_o
 file_name_fields <- "Subfields_Topics_v2.csv"
 full_output_path_fields <- file.path(output_directory, file_name_fields)
 
-write_excel_csv(tally_by_primary_field, file = full_output_path_fields)
+write_excel_csv(tally_subfields, file = full_output_path_fields)
 
 
 # might be helpful to look at the works just for some of the fields, 
 # or at least to look at the different subfield frequencies
 
+```
+
+```{r 4b) zooming into specific subfields}
+
+# want to look at the different subfields within certain 'topic_fields'
+
+# First, before narrowing it down by "unique"
+
+n_distinct(works_filt$primary_topic_subfield[works_filt$primary_topic_field == "Social Sciences"])  # [1] 21 
+n_distinct(works_filt$primary_topic[works_filt$primary_topic_field == "Social Sciences"])  # [1] 535
+
+
+# Next, after narrowing it down by "unique"
+
+n_distinct(works_filt_unique$primary_topic_subfield[works_filt_unique$primary_topic_field == "Social Sciences"])  # [1] 20 
+n_distinct(works_filt_unique$primary_topic[works_filt_unique$primary_topic_field == "Social Sciences"])  # [1] 335
+
+
+# This seems worth doing for SEVERAL of the fields
+
+
+tally_source_socsci <- prim_field_socsci %>% 
+  count(source_group, sort = TRUE, name = "tally") %>% 
+  mutate(pct = tally / nrow(prim_field_socsci))
+
+prim_field_socsci <- works_filt %>% 
+  filter(primary_topic_field == "Social Sciences")
+
+socsci_topics <- prim_field_socsci %>% 
+  group_by(primary_topic_subfield) %>% 
+  # summarise(n = n()) %>% 
+  # arrange()
+  mutate(n_subfields = n_distinct(primary_topic_subfield)) %>% 
+  mutate(n_topics = n_distinct(primary_topic)) %>% 
+  select(primary_topic_field, n_subfields, n_topics) %>% 
+  distinct(primary_topic_field, .keep_all = TRUE)
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_fields <- "Subfields_Topics_v2.csv"
+full_output_path_fields <- file.path(output_directory, file_name_fields)
+
+write_excel_csv(tally_subfields, file = full_output_path_fields)
+
+# want to try writing a for-loop or function to 
+# automate this iterative process of 
+    # finding the observations from a specific field
+    # grouping by subfield
+    # adding count columns for subfield and topic
+
+------------
+------------
+# making loops & functions:
+  # don't use actual variable names 
+  # writing a function not the same as calling a function
+  
+fields_list <- c("Social Sciences", "Environmental Science")
+# fields_out <- c("socsci", "envsci")
+subfield_excel <- function(wf, field, odir) {
+  fout <- gsub(" ","", field) %>% tolower() 
+  var_string <- deparse(substitute(wf))
+  
+  filt_data <- filter(wf, primary_topic_field == field) %>% 
+    group_by(primary_topic_subfield) %>% 
+    # count(primary_topic, sort = TRUE, name = "n_topics") %>% 
+    summarise(n_subfield = n()) # %>% 
+    # arrange(desc(n_subfield))
+    # mutate(n_subfields = count(primary_topic_subfield, )) # %>% 
+    
+  # write_excel_csv(filt_data, paste0(odir, fout, ".csv"))
+  write_excel_csv(filt_data, paste0(odir, fout, var_string, ".csv"))
+}
+
+for(i in fields_list) {
+  subfield_excel(wf = works_filt_unique, field = i, odir = output_directory)
+}
+
+----------
+----------
+  socsci_filt <- prim_field_socsci %>% 
+  group_by(primary_topic_subfield) %>% 
+  summarise(n_subfield = n()) %>% 
+  arrange(desc(n_subfield))
 
 prim_field_biochem <- works_filt %>% 
   filter(primary_topic_field == "Biochemistry, Genetics and Molecular Biology")
@@ -256,27 +365,11 @@ prim_field_econ <- works_filt %>%
 prim_field_agbio <- filt_works %>% 
   filter(primary_topic_field == "Agricultural and Biological Sciences")
 
-
-tally_biochem <- prim_field_biochem %>% 
-  count(source_group, sort = TRUE, name = "tally") %>% 
-  mutate(pct = tally / nrow(prim_field_biochem))
-
-biochem_topics <- prim_field_biochem %>% 
-  group_by(primary_topic_subfield) %>% 
-  count(primary_topic, sort = TRUE, name = "n_topics") %>% 
-  mutate(n_subfields = count(primary_topic_subfield, ))
-
 ```
 
 ```{r investigating the "primary topic" variables of the filtered UNIQUE works}
 
-n_distinct(works_filt_unique$primary_topic)  # [1] 1093
-n_distinct(works_filt_unique$primary_topic_domain)  # [1] 4
-n_distinct(works_filt_unique$primary_topic_field)  # [1] 25
-n_distinct(works_filt_unique$primary_topic_subfield)  # [1] 144
 
-n_distinct(works_filt_unique$primary_topic_subfield[works_filt_unique$primary_topic_field == "Social Sciences"])  # [1] 20 
-n_distinct(works_filt_unique$primary_topic[works_filt_unique$primary_topic_field == "Social Sciences"])  # [1] 335
 
 
 # to get results from below into Excel:
@@ -302,31 +395,31 @@ write_excel_csv(unique_by_primary_field, file = full_output_path_fields)
 
 # --- Deeper dive into top 8 fields --- #
 
-prim_field_socsci_overlap <- works_filt_unique %>% 
+prim_field_socsci_unique <- works_filt_unique %>% 
   filter(primary_topic_field == "Social Sciences")
 
-prim_field_econ_overlap <- works_filt_unique %>% 
+prim_field_econ_unique <- works_filt_unique %>% 
   filter(primary_topic_field == "Economics, Econometrics and Finance")
 
-prim_field_envirosci_overlap <- works_filt_unique %>% 
+prim_field_envirosci_unique <- works_filt_unique %>% 
   filter(primary_topic_field == "Environmental Science")
 
-prim_field_energy_overlap <- works_filt_unique %>% 
+prim_field_energy_unique <- works_filt_unique %>% 
   filter(primary_topic_field == "Energy")
 
-prim_field_eng_overlap <- works_filt_unique %>% 
+prim_field_eng_unique <- works_filt_unique %>% 
   filter(primary_topic_field == "Engineering")
 
-prim_field_busmgmt_overlap <- works_filt_unique %>% 
+prim_field_busmgmt_unique <- works_filt_unique %>% 
   filter(primary_topic_field == "Business, Management and Accounting")
 
-prim_field_decsci_overlap <- works_filt_unique %>% 
+prim_field_decsci_unique <- works_filt_unique %>% 
   filter(primary_topic_field == "Decision Sciences")
 
-prim_field_health_overlap <- works_filt_unique %>% 
+prim_field_health_unique <- works_filt_unique %>% 
   filter(primary_topic_field == "Health Professions")
 
-prim_field_agbio_overlap <- works_filt_unique %>% 
+prim_field_agbio_unique <- works_filt_unique %>% 
   filter(primary_topic_field == "Agricultural and Biological Sciences")
 
 # --- Base R option --- #
@@ -343,9 +436,10 @@ write_excel_csv(as.data.frame(table(prim_field_socsci_overlap$primary_topic_subf
 # run for each of the 9 fields above
 # no need to copy code, will just replace the necessary components
 
-agbio_overlap_topics <- prim_field_agbio_overlap %>% 
+socsci_filt <- prim_field_socsci %>% 
   group_by(primary_topic_subfield) %>% 
-  summarise(n_subfield = n())
+  summarise(n_subfield = n()) %>% 
+  arrange(desc(n_subfield))
  
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
