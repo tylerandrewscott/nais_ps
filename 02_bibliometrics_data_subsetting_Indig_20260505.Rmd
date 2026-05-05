@@ -1,0 +1,284 @@
+---
+title: " 02_bibliometrics_data_subsetting_soc_env_sci"
+author: "Mackenzie Johnson"
+date: "20260430"
+output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+library(ggplot2)
+library(knitr)
+library(tidyverse)
+library(stringr)
+```
+
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData1}
+
+works <- readRDS(file = "data/works.rds")
+refs <- readRDS(file = "data/refs.rds")
+
+```
+
+[UPDATE:  5/05/2026
+
+Still ran into problems using the new edgelist in the network-generation stage.  Came back to this stage to generate the relevant "works" and "refs" dataframes that are limited to just those works with an NAIS-relevant keyword in either the title field or the primary_topic field.  
+
+Also realized I need to switch the order in which I filter subset the refs.  Before I was removing the self-references and loops AFTER I limited the refs to just those IDs that appear 5 or more times, but actually I need to switch the order.  
+
+New workflow for this stage:
+1) filter the works
+2) clean the refs (remove self-refs and loops)
+3) generate a unique list of refs that have at least 5 occurrences
+4) subset the works to just those unique refs (%in%)
+5) subset the refs to match those works (%in%)]
+
+[UPDATE:  4/30/2026
+
+After switching the approach to limit the 'works' and 'refs' to those UNIQUE refs, I tried using the resultant edgelist for the Workflow Stage 3 (networks) - but it didn't go well.  There were too many clusters, the main cluster still had 90k+ components, and the community detection algorithm did not produce usable results.  Thus, I want to filter both (the 'works' and the 'refs') to just examine the works that have a "primary_topic_field" value of "Social Sciences" and/or "Environmental Science" in order to derive a network/clusters that I can actually analyze.
+
+Did NOT venture into step 10 (focus on NAIS-relevant topics/titles) today - want to test out the new edgelist in the next Workflow stage.]
+
+
+[UPDATE:  4/24-27/2026]
+Changed tactic - realized that finding the "overlapping" references probably misses references to older works, so generated the list of UNIQUE references (from both columns of "refs") (in Step 6) and then further filtered my "works_filt" to just those unique refs (in Step 7).  Created a new nodelist from this filtered works list of just those unique "refs".  Added an update to Step 8, which I might revisit in the future.  Edited the commentary for Step 9 because I added terms to the str_detect.  Then created a new nodelist in Step 10.  
+
+----------------------
+
+Step 1)  filter the "works" rds by:
+  - language (keep only those works in English)
+  - type (keep only articles and reviews)
+  - is.retracted (keep only those that have NOT been retracted)
+ 
+ Step 2) verify those worked by looking at the number of distinct values
+ 
+ Step 3) filter out additional observations by:
+  - publication year (keep only pre-2026)
+  - title (remove those with blank titles)
+  - primary topic (remove NA) [see code in "02b" for exploration of this variable]
+  - fwci (remove NA) [see code in "02b" for exploration of this variable]
+  - references_counted (remove any 0 values) [see code in "02b" for exploration of this variable]
+
+Step 4) select out several variables
+  - (In Liza's code, she only used work_id, publication year, language, type, and referenced_works_count, but I will keep other variables.)
+
+
+```{r Steps 1-4: subsetting the "works" rds}
+
+# originally had this filtered to just "article" but based on Wood et al. (2025), decided to also keep "review", "book" and "book-chapter" 
+
+works_filt <- works %>% 
+  filter(language == "en") %>% 
+  filter(type == "article" | type == "review") %>%  # | type == "book" | type == "book-chapter") 
+  filter(is_retracted == "FALSE") %>% 
+  filter(publication_year != 2026) %>% 
+  filter(title != "") %>% 
+  filter(!is.na(primary_topic)) %>% 
+  filter(!is.na(fwci)) %>% 
+  filter(referenced_works_count != 0) %>% 
+  filter(str_detect(title, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") | 
+           str_detect(primary_topic, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native")) %>%
+  select(-pmid, -mag, -publication_date, -language, -is_retracted, -is_paratext, -biblio_volume, -biblio_issue, -biblio_first_page, -biblio_last_page, -primary_source_type, -primary_source_issn_l, -created_date, -updated_date)
+
+
+#  want to test to make sure the filtering worked
+
+n_distinct(works_filt$language)  # [1] 1  IT WORKED - becomes [1] 0 with subsequent filtering
+n_distinct(works_filt$type)  # [1] 2  IT WORKED - becomes [1] 2 with subsequent filtering
+n_distinct(works_filt$is_retracted)  # [1] 1  IT WORKED - becomes [1] 0 with subsequent filtering
+n_distinct(works_filt$is_paratext)  # [1] 1  Didn't filter by this variable, but expected this result
+                                          # and as expected - - becomes [1] 0 with subsequent filtering
+
+# now I can go back and select out more columns
+# end result for now is 21 variables
+    # could probably select out more, but want to look at more bibliometric analyses first
+
+saveRDS(works_filt, "works_filtered_indig")
+```
+
+
+Moving on to the "refs" rds
+
+Step 5) Remove any self-references and loops 
+
+Step 6) keep only those articles that were cited at least 5 times (per Wood et al. 2025) 
+
+Step 7) Once I have filtered it down to only those references with 5 or more citations, generate a list of just the unique values from both the "citing" and "cited" columns (as in, it's unique to BOTH columns). This step is NEW - before, I was limiting the refs to just those IDs that appeared as both citing and cited, but that would selectively miss older works that are part of the conversation (older articles CAN'T cite newer ones).
+
+
+```{r Step 5) subsetting the "refs" rds - removing self-references and loops}
+
+nrow(refs)  # [1] 634527
+
+# remove self references
+
+refs_noselfs <- refs[citing_id != cited_id]
+nrow(refs_noselfs)  # [1] 634058 - so, it removed 469 rows
+
+# remove loops - per Liza's code:
+  # these shouldn't really be possible
+  # unless published in the same issue? And just a few more
+  # e.g. A -> B and B -> A
+
+el2 <- refs_noselfs %>% 
+  select(from = citing_id, to = cited_id)
+
+# Liza used a for-loop, but it is taking forever (gave up at 50 minutes)
+# Elise's recommendation:
+  # use the "which" statement from Liza's for-loop to create an "index"
+  # el2 <- el2[!index,] 
+  # filter out those rows all at once
+
+loop_index <- which(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))
+
+refs_clean <- el2[!loop_index,]
+
+# checks if this approach worked:
+  # length(loop_index)  # [1] 5636
+  # nrow(refs_reduced)  # [1] 628422
+  # nrow(el2) - length(loop_index)  # [1] 628422 - IT WORKED!!
+
+network_edgelist_clean <-refs_clean
+
+saveRDS(network_edgelist_clean, "edgelist_full_clean")
+
+```
+
+```{r Steps 6-7) reducing the refs by number of occurrences and generating list of uniques }
+
+refs_citing_only_v2 <- refs_clean %>% 
+  count(from, sort = TRUE, name = "tally") %>% 
+  filter(tally >= 5) %>% 
+  select(-tally, citation = from)
+
+n_distinct(refs_citing_only_v2)  # [1] 43025
+  
+refs_cited_only_v2 <- refs_clean %>% 
+  count(to, sort = TRUE, name = "tally") %>% 
+  filter(tally >= 5) %>% 
+  select(-tally, citation = to)
+
+n_distinct(refs_cited_only_v2)  # [1] 32644
+
+nrow(refs_cited_only_v2) + nrow(refs_citing_only_v2)  # [1] 75669
+
+refs_unique <- bind_rows(refs_citing_only_v2, refs_cited_only_v2) %>% 
+  unique()
+
+n_distinct(refs_unique)  # [1] 56200
+
+saveRDS(refs_unique, "data/refs_unique")
+
+```
+
+
+Step 8) Limit the "filt_works" to just those unique references in "refs"
+
+
+```{r subsetting the filtered works to match the unique refs}
+
+works_indig_unique <- works_filt %>% 
+  filter(work_id %in% refs_unique$citation)
+
+nrow(works_indig_unique) # [1] 473
+nrow(works_filt) - nrow(works_indig_unique)  # [1] 2481
+
+print(count(works_indig_unique, is.na(work_id)))  # 1:          FALSE 473, no so "NA" values
+
+# so, there are 2472 references in the "works" rds that 
+# DO contain the NAIS-relevant keywords, 
+      # BUT will NOT included in the network analysis
+
+# I generated a csv of the 2954 works with NAIS keywords in the topic or title field
+    # in the "02b" workflow code
+
+# But I want a separate one of the just the works that will be used for the network analysis
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_indig_unique <- "Indigenous_unique_20260505.csv"
+full_output_path_fields <- file.path(output_directory, file_name_indig_unique)
+
+write_excel_csv(works_indig_unique, file = full_output_path_fields)
+
+# will save this as the nodelist for network analysis
+
+saveRDS(works_indig_unique, "nodelist_indig")
+
+```
+
+
+Step 9) Having created the node list for the network analysis, need to also create the edge list.
+
+```{r 9) Creating the "indigenous-themed" edgelist}
+
+# now will limit the refs (clean) to just those works with NAIS-specific titles or topics
+
+refs_or <- refs_clean %>% 
+  filter((from %in% works_indig_unique$work_id) | (to %in% works_indig_unique$work_id))
+
+refs_and <- refs_clean %>% 
+  filter((from %in% works_indig_unique$work_id) & (to %in% works_indig_unique$work_id))
+
+nrow(refs_or) - nrow(refs_and)   
+  # [1] 3876 - the number of works for which either the "from" or "to" 
+                  # do not ALSO use NAIS-keywords in the title or "primary_topic" field
+
+saveRDS(refs_or, "edgelist_indig_or")
+saveRDS(refs_and, "edgelist_indig_and")
+
+
+```
+
+
+Step 10) Given the size of the community clusters generated using the "full" edgelist (the 'refs narrowed down to match the filtered 'works'), I want to filter both to just examine the works that have a "primary_topic_field" value of "Social Sciences" and/or "Environmental Science" in order to derive a network/clusters that I can actually analyze.  
+
+Starting the 'works' object:  I wanted to do these separately but also together.  Because the "work_id" has a 1:1 link with "primary_topic_field" (meaning, each work_id can only have 1 value of the primary_topic_field), summing the number of I get from filtering by each individual field should equal the number I get when I filter using either/or - which it does.
+
+BUT, when I go to use these as inputs for filtering down the 'refs' object - the math doesn't work out the same.
+  - I use %in% to find the "from" refs OR the "to" refs in the "work_id" of the 'works' object
+  - but b/c a work "from" - say - the social science field might be referencing a work from another field
+  - the "from" | "to" filters on the individually run topic fields won't match the same call on the combined 'works'
+  - but if I use &, then I'm only going to get observations for which BOTH the from and to are part of the 'works'
+  - meaning, I won't know if there are connection to other fields or not
+  
+BUT - maybe I'm not interpreting that correctly...maybe filtering using the "&" doesn't mean both the "from" and "to" for any given row have to be in the 'works' object - so, does "filter" work row-wise or column-wise??
+  
+So, next steps: stick with just the works that have NAIS-coded titles or "primary_topic" fields
+
+
+```{r 10) getting just the refs with an NAIS-coded title or primary topic}
+
+
+
+```
+
+
+
+Step 10) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the unique list of references, there are 482 observations that have "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") in either the title or primary topic field - which equates to 0.88% of the works.  (In the full list of filtered references, including those not found in the unique "refs", there are 2954 observations - which equates to 2.8%.)  [see code in "02b" for exploration of this occurrence] 
+
+
+
+
+```{r code for writing csvs}
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_fields <- "Subfields_Topics.csv"
+full_output_path_fields <- file.path(output_directory, file_name_fields)
+
+write_excel_csv(df, file = full_output_path_fields)
+
+```
+
+
