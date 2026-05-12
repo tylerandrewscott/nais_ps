@@ -1,0 +1,319 @@
+---
+title: "03_bibliometrics_networks_indig_full"
+author: "Mackenzie Johnson"
+date: "2026-04-09"
+output: html_document
+---
+
+  
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+# knitr::opts_chunk$set(eval = FALSE)
+# knitr::opts_chunk$set(include = FALSE)
+
+```
+
+```{r libraries}
+
+# install.packages("pbapply")
+# install.packages("slam")
+# install.packages("ggraph")
+
+library(data.table)
+library(ggplot2)
+library(ggraph)
+library(igraph)
+library(knitr)
+library(Matrix)
+library(pbapply)
+library(slam)
+library(stringr)
+library(tidyverse)
+
+```
+
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData}
+
+# edgelist
+
+el_big <- readRDS(file = "data/edgelist_indig_or")  # 4603 observations of 2 variables
+# el_sm <- readRDS(file = "data/edgelist_indig_and")  # 727 observations of 2 variables
+
+```
+
+[UPDATE:  4/27/2026 and 5/12/2016
+
+Started trying to make sense of the network again now that I have a new edgelist.  I brought the clustering algorithm out of the for-loop.  Made it through 2c.]
+
+
+Step 1)  Create a citation graph following Wood et al. (2025) - code is available in Liza Wood's Github repository "tamar"
+        a) start with a full graph
+        b) simplify it by removing any multiple edges or loop edges - BUT!  WARNING!  Elise says "simplify" is notoriously wonky
+        c) test if it's "connected"
+
+        
+Regarding "is_connected()"
+
+From "networkx.org" documentation for doing network analysis in Python:
+  * "A graph is connected if, for every pair of distinct nodes, there is a path between them. If there is a pair of nodes for which such path does not exist, the graph is not connected (also referred to as “disconnected”)"
+
+From github:  https://olizardo.github.io/networks-textbook/lesson-graphs-connectivity.html
+  * "A graph is CONNECTED if there exists a (finite) path between each pair of nodes.  A graph is DISCONNECTED if there does not exist a path connecting every pair of nodes"
+  
+From github:  https://yunranchen.github.io/intro-net-r/igraph.html
+  * "Connected: if there is a path from any vertex to any other.  Unconnected: if not connected. An unconnected graph has multiple components." 
+       
+       
+```{r 1-big) create initial citation graph}
+
+# this block is essentially copy-pasted from Liza's code
+  # only difference is I added some annotations
+
+# this run is for articles with NAIS-themed titles or primary_topic
+    # in the FULL list of works (after filtering/before limiting to the unique refs)
+    # meaning: these works might reference works that do NOT have NAIS-themed titles or topics
+
+
+cit_graph_indig_full <- graph_from_edgelist(as.matrix(el_big), directed = T)  # List of 3250
+
+# str(cit_graph_big)
+
+
+cit_graph_indig_full <- igraph::simplify(cit_graph_indig_full, remove.multiple = T, remove.loops = T)
+  # remove.multiple	Logical, whether the multiple edges are to be removed
+  # remove.loops	Logical, whether the loop edges are to be removed
+
+# Liza didn't do this next step, but I want to check
+
+is_connected(cit_graph_indig_full, mode = "weak")  # [1] FALSE
+
+# FALSE means that it is disconnected (meaning, there are gaps between some of the nodes)
+
+count_components(cit_graph_indig_full)  # [1] 25 --- matches component details in the next chunk
+
+# to get a histogram for the maximal connected component sizes: 
+  # component_distribution(cit_graph_indig_full)
+
+```
+
+
+Step 2) Network components ("maximal induced subgraph that is connected")
+        a) Find connected components of the citation graph and visualize the network
+        b) For those components from the main cluster (with 69,041 elements out of 69,144), create subgraph
+        c) run clustering algorithm on the main cluster - start with Louvain
+        d) examine modularity
+        e) examine Page Rank estimates of citation importance
+    
+
+```{r 2a-big) find connected components of the larger graph}
+
+# this block is essentially copy-pasted from Liza's code
+  # changed "clu" to "comps"
+  # added some annotations
+
+# despite the "FALSE" result above for "is_connected" 
+# ran the "components" function using both "weak" and "strong" modes
+    # the "weak" run yielded the same thing as not specifiying the mode, 
+    # the "strong" run yielded 3250 clusters - seems like a Directed Acyclic Graph (?)
+ 
+
+comps_indig_full <- components(cit_graph_indig_full, mode = "weak")  # List of 3: $ membership, $ csize, $ no
+str(comps_indig_full)
+  # List of 3
+  # $ membership: Named num [1:3250] 1 1 1 1 1 1 1 1 1 1 ...
+    # ..- attr(*, "names")= chr [1:3250] "W1579625741" "W1995811201" ...
+  # $ csize     : num [1:25] 3013 15 14 10 6 ... ...
+  # $ no        : num 25
+
+# --- grouping/summarizing doesn't work --- "
+
+    # Error in UseMethod("group_by") : 
+        # no applicable method for 'group_by' applied to an object of class "list"
+
+
+table(comps_indig_full$membership)
+
+# 1       2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17   18   19 
+# 3013   15   14   10    6    7   10    6    7   10   12    9   11   11   12    6    6   17   18 
+
+#   20   21   22   23   24   25 
+#   12    9    7    9    7    6 
+
+# translation:  there are 25 clusters - 3013 elements are all in 1 cluster
+# meaning, need to compute the communities JUST using the elements in the main cluster
+
+connected_indig_full <- names(comps_indig_full$membership)[comps_indig_full$membership == 1]
+
+str(connected_indig_full)  #  [1:3013]  
+    # --> which means 237 works were NOT INCLUDED in the main cluster (3250-3013)
+
+# Got some visualization code from Sara!  
+
+ggraph(cit_graph_indig_full, layout = "fr") +
+geom_edge_fan(
+end_cap = circle(1, "mm"),
+color = "#000000",
+width = 0.3,
+arrow = arrow(angle = 15, length = unit(0.07, "inches"), ends = "last", type = "closed"))+
+geom_node_point(alpha = 0.2) +
+labs(title = "NAIS-themed Citations (full works)") + theme_void()
+
+```
+
+
+```{r 2b-big) create subgraph and undirected version}
+
+# this block is essentially copy-pasted from Liza's code
+  # changed "clu" to "comps" but no other changes
+
+# the following code is for extracting the main blob, 
+# but I also want to see what happens when I run it on the full network
+    # especially given that it seems like there are multiple clusters when I plotted the network 
+
+if(any(comps_indig_full$membership>1)){
+  cit_graph_indig_full_main <- induced_subgraph(cit_graph_indig_full,v = which(V(cit_graph_indig_full)$name %in% connected_indig_full))
+  cit_graph_indig_full <- cit_graph_indig_full_main
+}
+
+cit_graph_indig_full_ud <- as.undirected(cit_graph_indig_full, 'collapse')
+
+
+# save the citation graph network
+saveRDS(cit_graph_indig_full, "indig_cit_full.rds")
+
+# save the undirected citation graph network for use in clustering
+saveRDS(cit_graph_indig_full_ud, "indig_cit_full_ud.rds")
+
+```
+
+
+```{r 2c-big) run clustering algorithm}
+
+# this block is essentially copy-pasted from Liza's code
+
+# recall that she had a much higher seed value under certain call conditions
+      # if(LOCATION == 'data/query_EG/' & ADD_SUPPL_WOS_REFS == F){
+        #  pref_seed <- 4812
+        #  } else{
+
+# will try running it with the set.seed set to 12 
+    # idea is to seed a pseudo random number generator using a reproducible seed 
+    # select 1000 numbers with equal weighting from the set 0:9999
+    # why do we need this?
+
+set.seed(12)  # Liza comment: # and 16 got to 8, dropped PES and joined it with PE
+seeds <- sample.int(9999, 1000)
+
+mod_indig_full <- list()
+for(i in 1:length(seeds)){
+  set.seed(seeds[i])
+      # why is the clustering algo in the for-loop? 
+      # Not affected by iteration, move to outside of loop for efficiency
+  louv_indig_full <- cluster_louvain(cit_graph_indig_full_ud)
+  mod_indig_full$mod[i] <- modularity(louv_indig_full)
+  mod_indig_full$min_n[i] <- min(table(louv_indig_full$membership))
+}
+mods <- unlist(mod_indig_full$mod)
+min_ns <- unlist(mod_indig_full$min_n)
+
+# saveRDS(louv_indig, "Louvain_indig")
+# louv <- readRDS(file = "data/Louvain_full")
+    
+head(mods)  # [1] 0.8170753 0.8162952 0.8183118 0.8163955 0.8195041 0.8157186
+tail(mods)  # [1] 0.8154065 0.8164846 0.8171450 0.8147561 0.8165310 0.8180804
+
+head(louv_indig_full$modularity)  # [1] 0.6202836 0.7887157 0.8178573 0.8180804
+tail(louv_indig_full$modularity)  # [1] 0.6202836 0.7887157 0.8178573 0.8180804
+
+```
+
+
+```{r 2d-big) examine modularity and degrees}
+
+# this block is essentially copy-pasted from Liza's code
+
+pref_seed <- seeds[which(mods == max(mods))]
+
+set.seed(pref_seed)  # Liza comment:  # 4262 with min size of 80, 2925 with min size of 30
+
+V(cit_graph_big_main)$louv_cluster <- louv_indig_big$membership
+
+# modularity measure
+    # B_ij = A_ij - γ k_i k_j / (2m)  == for UNDIRECTED graphs
+    # B_ij = A_ij - γ k^out_i k^in_j / m == for DIRECTED graphs
+
+modularity(louv_indig_big)
+B = modularity_matrix(cit_graph_big_main)
+
+
+# out-degree, in-degree, total-degree 
+
+summary(degree(cit_graph_big_main,mode = 'out'))
+  # Min.    1st Qu.  Median    Mean 3rd Qu.    Max. 
+  # 0.000    0.000   1.000   1.457   1.000  35.000 
+
+summary(degree(cit_graph_big_main,mode = 'in'))
+  #  Min.  1st Qu.   Median     Mean    3rd Qu.     Max. 
+  #  0.000   0.000   1.000      1.457   1.000     76.000
+
+summary(degree(cit_graph_big_main, mode = "all"))
+  #  Min. 1st Qu.  Median    Mean   3rd Qu.    Max. 
+  # 1.000   1.000   1.000   2.913   2.000     78.000 
+
+# Add network summary
+table(louv_indig_big$membership)
+mean(table(louv_indig_big$membership))  # [1] 100.4333
+median(table(louv_indig_big$membership))  # [1] 76
+min(table(louv_indig_big$membership))  # [1] 12
+max(table(louv_indig_big$membership))  # [1] 442
+
+```
+
+
+```{r e-big) PageRank measure of citation importance}
+
+prank <- page_rank(cit_graph_big)
+V(cit_graph_big)$prank <- unlist(as.vector(prank$vector))
+
+betw <- betweenness(cit_graph_big)
+V(cit_graph_big)$betweenness <- as.vector(betw)
+betw_group <- data.table(node = V(cit_graph_big)$name,
+                         between = betw,
+                         group = V(cit_graph_big_main)$louv_cluster)
+betw_group[,grank:=rank(-between,ties.method = 'average'),by=.(group)]
+
+# when using "data.table" package, 
+# don't have to re-store or re-assign variable
+    # so the code above DOES create a column for "grank" even though it doesn't look like it
+        # (which is why the next line is able to call it)
+
+V(cit_graph_big)$high_between <- V(cit_graph_big)$name %in% betw_group[grank<=4,]$node
+
+# Liza commented out the next line
+# V(cit_graph)[betw == max(betw)]
+
+prank_max <- data.table(node = V(cit_graph_big)$name,
+                        group = unlist(V(cit_graph_big_main)$louv_cluster),
+                        pagerank = unlist(V(cit_graph_big)$prank))
+
+prank_max_by_group <- prank_max[,max(pagerank),by=.(group)]
+
+max_by_group = dplyr::left_join(prank_max,prank_max_by_group)[pagerank==V1,]
+
+V(cit_graph_big)$highest_in_group <- V(cit_graph_big)$name %in% max_by_group$node
+
+saveRDS(cit_graph_big, "indig_cit_full.rds")
+# indig_cit_full <- readRDS(file = "data/indig_cit_full.rds")
+
+```
+
