@@ -32,6 +32,12 @@ refs <- readRDS(file = "data/refs.rds")
 
 ```
 
+[UPDATE:  5/12/2026
+
+Because I am interested in seeing who all is citing NAIS-themed works and who NAIS-themed works are citing, I found the edgelist by filtering "refs" down to any rows that had one of the NAIS-themed works (based on title or primary_topic) in EITHER the citing or cited columns.  
+
+BUT, that means my nodelist needs to include the works that are NOT in my NAIS-themed subset because - basically need my nodelist to match the edgelist.  So added "6)" to the workflow below.]
+
 [UPDATE:  5/05/2026
 
 Still ran into problems using the new edgelist in the network-generation stage.  Came back to this stage to generate the relevant "works" and "refs" dataframes that are limited to just those works with an NAIS-relevant keyword in either the title field or the primary_topic field.  
@@ -44,6 +50,7 @@ New workflow for this stage:
 3) generate a unique list of refs that have at least 5 occurrences
 4) subset the works to just those unique refs (%in%)
 5) subset the refs to match those works (%in%)]
+6) make the nodelist match the edgelist
 
 [UPDATE:  4/30/2026
 
@@ -132,7 +139,7 @@ nrow(refs_noselfs)  # [1] 634058 - so, it removed 469 rows
   # unless published in the same issue? And just a few more
   # e.g. A -> B and B -> A
 
-el2 <- refs_noselfs %>% 
+el <- refs_noselfs %>% 
   select(from = citing_id, to = cited_id)
 
 # Liza used a for-loop, but it is taking forever (gave up at 50 minutes)
@@ -141,18 +148,17 @@ el2 <- refs_noselfs %>%
   # el2 <- el2[!index,] 
   # filter out those rows all at once
 
-loop_index <- which(paste(el2$from, el2$to) %in% paste(el2$to, el2$from))
+loop_index <- which(paste(el$from, el$to) %in% paste(el$to, el$from))
 
-refs_clean <- el2[!loop_index,]
+refs_clean <- el[!loop_index,]
 
 # checks if this approach worked:
   # length(loop_index)  # [1] 5636
   # nrow(refs_reduced)  # [1] 628422
   # nrow(el2) - length(loop_index)  # [1] 628422 - IT WORKED!!
 
-network_edgelist_clean <-refs_clean
 
-saveRDS(network_edgelist_clean, "edgelist_full_clean")
+saveRDS(refs_clean, "refs_clean")
 
 ```
 
@@ -179,7 +185,7 @@ refs_unique <- bind_rows(refs_citing_only_v2, refs_cited_only_v2) %>%
 
 n_distinct(refs_unique)  # [1] 56200
 
-saveRDS(refs_unique, "data/refs_unique")
+saveRDS(refs_unique, "refs_unique")
 
 ```
 
@@ -199,7 +205,7 @@ print(count(works_indig_unique, is.na(work_id)))  # 1:          FALSE 473, no so
 
 # so, there are 2472 references in the "works" rds that 
 # DO contain the NAIS-relevant keywords, 
-      # BUT will NOT included in the network analysis
+      # BUT will NOT be included in the network analysis
 
 # I generated a csv of the 2954 works with NAIS keywords in the topic or title field
     # in the "02b" workflow code
@@ -212,21 +218,26 @@ full_output_path_fields <- file.path(output_directory, file_name_indig_unique)
 
 write_excel_csv(works_indig_unique, file = full_output_path_fields)
 
-# will save this as the nodelist for network analysis
-
-saveRDS(works_indig_unique, "nodelist_indig")
-
 ```
 
 
-Step 9) Having created the node list for the network analysis, need to also create the edge list.
+Step 9) With that set of NAIS-themed works, need to create the edge list.
+
+Will use "or" to get the broader landscape of conversation.  (If I use &, then I'm only going to get observations for which BOTH the from and to are part of the NAIS-themed works - meaning, I won't know if there are connections to other fields or not.)
 
 ```{r 9) Creating the "indigenous-themed" edgelist}
 
-# now will limit the refs (clean) to just those works with NAIS-specific titles or topics
+# will limit the refs (clean) to just those works with NAIS-specific titles or topics
+
+# this will find references that are NOT NAIS-themed but 
+    # do reference or are referenced by one of the NAIS-themed works
 
 refs_or <- refs_clean %>% 
   filter((from %in% works_indig_unique$work_id) | (to %in% works_indig_unique$work_id))
+
+
+# this is a more insular approach - will include
+    # only NAIS-themed works that reference or are referenced by other NAIS-themed works
 
 refs_and <- refs_clean %>% 
   filter((from %in% works_indig_unique$work_id) & (to %in% works_indig_unique$work_id))
@@ -242,31 +253,57 @@ saveRDS(refs_and, "edgelist_indig_and")
 ```
 
 
-Step 10) Given the size of the community clusters generated using the "full" edgelist (the 'refs narrowed down to match the filtered 'works'), I want to filter both to just examine the works that have a "primary_topic_field" value of "Social Sciences" and/or "Environmental Science" in order to derive a network/clusters that I can actually analyze.  
+Step 10) Need to a) repeat the process of getting only unique values of the "refs_or" subset, then b) filter the "works" to just those IDs to generate the nodelist.  
 
-Starting the 'works' object:  I wanted to do these separately but also together.  Because the "work_id" has a 1:1 link with "primary_topic_field" (meaning, each work_id can only have 1 value of the primary_topic_field), summing the number of I get from filtering by each individual field should equal the number I get when I filter using either/or - which it does.
 
-BUT, when I go to use these as inputs for filtering down the 'refs' object - the math doesn't work out the same.
-  - I use %in% to find the "from" refs OR the "to" refs in the "work_id" of the 'works' object
-  - but b/c a work "from" - say - the social science field might be referencing a work from another field
-  - the "from" | "to" filters on the individually run topic fields won't match the same call on the combined 'works'
-  - but if I use &, then I'm only going to get observations for which BOTH the from and to are part of the 'works'
-  - meaning, I won't know if there are connection to other fields or not
+
+```{r 10a) getting just the refs with an NAIS-coded title or primary topic}
+
+# get the unique list of refs in the "refs_or" object
+
+refs_citing_only_or <- refs_or %>% 
+  count(from, sort = TRUE, name = "tally") %>% 
+  # filter(tally >= 5) %>% 
+  select(-tally, citation = from)
+
+n_distinct(refs_citing_only_or)  # [1] 1793
   
-BUT - maybe I'm not interpreting that correctly...maybe filtering using the "&" doesn't mean both the "from" and "to" for any given row have to be in the 'works' object - so, does "filter" work row-wise or column-wise??
-  
-So, next steps: stick with just the works that have NAIS-coded titles or "primary_topic" fields
+refs_cited_only_or <- refs_or %>% 
+  count(to, sort = TRUE, name = "tally") %>% 
+  # filter(tally >= 5) %>% 
+  select(-tally, citation = to)
 
+n_distinct(refs_cited_only_or)  # [1] 1941
 
-```{r 10) getting just the refs with an NAIS-coded title or primary topic}
+nrow(refs_cited_only_or) + nrow(refs_citing_only_or)  # [1] 3734
 
+refs_unique_or <- bind_rows(refs_citing_only_or, refs_cited_only_or) %>% 
+  unique()
+
+n_distinct(refs_unique_or)  # [1] 3250
+
+saveRDS(refs_unique_or, "refs_unique_Indig")
 
 
 ```
 
 
+```{r 10b) subsetting the filtered works to match the unique refs}
 
-Step 10) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the unique list of references, there are 482 observations that have "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") in either the title or primary topic field - which equates to 0.88% of the works.  (In the full list of filtered references, including those not found in the unique "refs", there are 2954 observations - which equates to 2.8%.)  [see code in "02b" for exploration of this occurrence] 
+works_indig_or <- works %>% 
+  filter(work_id %in% refs_unique_or$citation) %>% 
+  select(-pmid, -mag, -publication_date, -language, -is_retracted, -is_paratext, -biblio_volume, -biblio_issue, -biblio_first_page, -biblio_last_page, -primary_source_type, -primary_source_issn_l, -created_date, -updated_date)
+
+saveRDS(works_indig_or, "nodelist_Indig_full.rds")
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name_indig_or <- "Nodelist_Indig_full_20260512.csv"
+full_output_path_fields <- file.path(output_directory, file_name_indig_or)
+
+write_excel_csv(works_indig_or, file = full_output_path_fields)
+
+```
+Step 10) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the unique list of references, there are 473 observations that have "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") in either the title or primary topic field - which equates to 0.88% of the works.  (In the full list of filtered references, including those not found in the unique "refs", there are 2954 observations - which equates to 2.8%.)  [see code in "02b" for exploration of this occurrence] 
 
 
 

@@ -1,7 +1,7 @@
 ---
-title: "03_bibliometrics_networks_indig_full"
+title: "04_cluster_descrip_indig_full_20260512"
 author: "Mackenzie Johnson"
-date: "2026-04-09"
+date: "2026-05-12"
 output: html_document
 ---
 
@@ -20,17 +20,21 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 # install.packages("pbapply")
 # install.packages("slam")
 # install.packages("ggraph")
+# install.packages("udpipe")  
+      # Tokenising, Lemmatising, Tagging and Dependency Parsing of raw text in TIF format
 
 library(data.table)
+library(dplyr)
 library(ggplot2)
 library(ggraph)
 library(igraph)
 library(knitr)
 library(Matrix)
 library(pbapply)
-library(slam)
+library(slam)  # Sparse Lightweight Arrays and Matrices
 library(stringr)
 library(tidyverse)
+library(udpipe)
 
 ```
 
@@ -44,60 +48,40 @@ getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
 
 ```{r GetData}
 
-# raw data
-
-works <- readRDS(file = "data/works.rds")
-refs <- readRDS(file = "data/refs.rds")
-
-# edgelist
-
-el_big <- readRDS(file = "data/edgelist_indig_or")  # 4603 observations of 2 variables
-# el_sm <- readRDS(file = "data/edgelist_indig_and")  # 727 observations of 2 variables
-
 # nodelist (aka "metadata")
 
-M-dt <- readRDS(file = "data/nodelist_indig.rds")
+M_dt <- readRDS(file = "nodelist_Indig_full.rds")
 
-# citation graph
+# citation graph - with data from cluster algorithm
 
-indig_cit_full <- readRDS(file = "data/indig_cit_full.rds")
+cit_graph <- readRDS(file = "data/indig_clusters_full.rds")
 
+dim(M_dt)  # [1] 3250   21
+summary(cit_graph)  # List of 3013
 
+# difference is the 237 "unconnected" components
 
 ```
 
-[UPDATE:  4/27/2026
+To Recap:
 
-Started trying to make sense of the network again now that I have a new edgelist.  I brought the clustering algorithm out of the for-loop.  Made it through 2c.]
+I filtered the "works" to JUST those with NAIS-themed keywords in their title or primary_topic variables.  I found the "refs" that matched those work_ids - the resultant edgelist includes NAIS-themed works that appear in EITHER the "citing" ("from") or "cited" ("to") columns of the "refs" object.  That means they could be citing or cited by works that do NOT have NAIS-themed titles or primary-topics.  Using the edgelist, created a citation network and ran the Louvain clustering algorithm to identify clusters.  
+
+The citation graph I'm starting with here "indig_clus_full" includes node modularity and betweenness centrality values, cluster membership, and 2 ranked measures of citation importance (page rank and grank).  
+
+Here I want to link the citation graph to the nodelist and then explore the combined dataset: descriptive statistics and network visualizations that display some of the node attributes.
 
 
-Step 1)  Create a citation graph following Wood et al. (2025) - code is available in Liza Wood's Github repository "tamar"
-        a) start with a full graph
-        b) simplify it by removing any multiple edges or loop edges - BUT!  WARNING!  Elise says "simplify" is notoriously wonky
-        c) test if it's "connected"
+Step 1)  Add an attribute in the node-list for the cluster membership
        
        
-```{r 1-big) create citation graphs}
+```{r 1) add cluster membership to node-list}
 
 # this block is essentially copy-pasted from Liza's code
-  # only difference is I added some annotations
 
-# this run is for articles with NAIS-themed titles or primary_topic
-    # in the FULL list of works (after filtering/before limiting to those unique refs)
+M_dt$cluster <- V(cit_graph)$louv_cluster[match(M_dt$id,V(cit_graph)$name)]
 
-
-cit_graph_big <- graph_from_edgelist(as.matrix(el_big), directed = T)  # List of 3250
-
-# str(cit_graph_big)
-
-
-cit_graph_big <- igraph::simplify(cit_graph_big, remove.multiple = T, remove.loops = T)
-  # remove.multiple	Logical, whether the multiple edges are to be removed
-  # remove.loops	Logical, whether the loop edges are to be removed
-
-# Liza didn't do this next step, but I want to check
-
-is_connected(cit_graph_big, mode = "weak")  # [1] FALSE
+table(M_dt$cluster)  # < table of extent 0 >
 
 ```
 
