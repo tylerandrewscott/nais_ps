@@ -1,7 +1,7 @@
 ---
-title: " 02_bibliometrics_data_subsetting_clean"
+title: " 02_bibliometrics_data_subsetting_soc_env_sci"
 author: "Mackenzie Johnson"
-date: "20260401"
+date: "20260430"
 output: html_document
 ---
   
@@ -31,6 +31,12 @@ works <- readRDS(file = "data/works.rds")
 refs <- readRDS(file = "data/refs.rds")
 
 ```
+
+[UPDATE:  4/30/2026
+
+After switching the approach to limit the 'works' and 'refs' to those UNIQUE refs, I tried using the resultant edgelist for the Workflow Stage 3 (networks) - but it didn't go well.  There were too many clusters, the main cluster still had 90k+ components, and the community detection algorithm did not produce usable results.  Thus, I want to filter both (the 'works' and the 'refs') to just examine the works that have a "primary_topic_field" value of "Social Sciences" and/or "Environmental Science" in order to derive a network/clusters that I can actually analyze.
+
+Did NOT venture into step 10 (focus on NAIS-relevant topics/titles) today - want to test out the new edgelist in the next Workflow stage.]
 
 
 [UPDATE:  4/24-27/2026]
@@ -145,7 +151,6 @@ print(count(works_filt_unique, is.na(work_id)))  # 1:          FALSE 54917, no s
 
 # will save this as the nodelist for network analysis
 
-saveRDS(works_filt_unique, "network_nodelist")
 saveRDS(works_filt_unique, "works_filtered_unique")
 
 ```
@@ -185,9 +190,9 @@ refs_reduced <- el2[!loop_index,]
   # nrow(refs_reduced)  # [1] 628422
   # nrow(el2) - length(loop_index)  # [1] 628422 - IT WORKED!!
 
-network_edgelist_v2 <-refs_reduced
+# network_edgelist_v2 <-refs_reduced
 
-saveRDS(network_edgelist_v2, "edgelist_reduced_v2")
+# saveRDS(network_edgelist_v2, "edgelist_reduced_v2")
 
 ```
 
@@ -211,52 +216,39 @@ So, next steps: stick with one primary_topic field
 ```{r 9) getting just the social science and environmental science works and refs}
 
 # will filter the 'works' 3x:  1x each for soc_sci and enviro_sci and 1x combined
+# BUT, with guidance from Sara - choosing to use the version with both fields
 
-works_soc_sci <- works_filt_unique %>% 
-  filter(primary_topic_field == "Social Sciences")
+# works_soc_sci <- works_filt_unique %>% 
+#   filter(primary_topic_field == "Social Sciences")
 
-works_enviro_sci <- works_filt_unique %>% 
-  filter(primary_topic_field == "Environmental Science")
+# works_enviro_sci <- works_filt_unique %>% 
+#   filter(primary_topic_field == "Environmental Science")
 
 works_soc_enviro_sci <- works_filt_unique %>% 
   filter((primary_topic_field == "Social Sciences") | (primary_topic_field == "Environmental Science"))
 
 (nrow(works_soc_sci) + nrow(works_enviro_sci)) == nrow(works_soc_enviro_sci)  # [1] TRUE - It worked!
 
+saveRDS(works_soc_enviro_sci, "nodelist_soc_env_sci")
+
+# ------------- #
+
 # now will limit the refs (reduced) to just those works
 
-refs_soc_sci <- refs_reduced %>% 
-  filter((from %in% works_soc_sci$work_id) & (to %in% works_soc_sci$work_id))  # [1] 261716 "or" // [1] 133577 "and"
+refs_or <- refs_reduced %>% 
+  filter((from %in% works_soc_enviro_sci$work_id) | (to %in% works_soc_enviro_sci$work_id))
 
-refs_enviro_sci <- refs_reduced %>% 
-  filter((from %in% works_enviro_sci$work_id) & (to %in% works_enviro_sci$work_id))  # [1] 141232 "or" // [1] 53607 "and"
+refs_and <- refs_reduced %>% 
+  filter((from %in% works_soc_enviro_sci$work_id) & (to %in% works_soc_enviro_sci$work_id))
 
-# to use the 'works' object that had been filtered using BOTH fields
-# I first started with "or" then also tried "and" - see commentary 
+nrow(refs_or) - nrow(refs_and)   
+  # [1] 177104 - the number of works for which either the "from" or "to" are not soc or env sci
 
-# refs_soc_enviro_sci <- refs_reduced %>% 
- #  filter((from %in% works_soc_enviro_sci$work_id) | (to %in% works_soc_enviro_sci$work_id))  # [1] 383618
-
-refs_soc_enviro_sci <- refs_reduced %>% 
-  filter((from %in% works_soc_enviro_sci$work_id) & (to %in% works_soc_enviro_sci$work_id))  # [1] 206514
-
-(nrow(refs_soc_sci) + nrow(refs_enviro_sci)) == nrow(refs_soc_enviro_sci)  # [1] FALSE
-  
-nrow(refs_soc_sci) + nrow(refs_enviro_sci)  # [1] 402948 "or" // [1] 187184 "and"
-nrow(refs_soc_enviro_sci)  # [1] 383618 if "or" // [1] 206514 if "and"
-
-n_distinct(refs_soc_sci$from)  # [1] 37532
-n_distinct(refs_soc_sci$to)  # [1] 33750
-n_distinct(refs_enviro_sci$from)  # [1] 28753
-n_distinct(refs_enviro_sci$to)  # [1] 26639
-
-n_distinct(refs_soc_sci$from) + n_distinct(refs_enviro_sci$from)  # [1] 66285
-n_distinct(refs_soc_sci$to) + n_distinct(refs_enviro_sci$to)  # [1] 60389
-
-n_distinct(refs_soc_enviro_sci$from)  # [1] 24185
-n_distinct(refs_soc_enviro_sci$to)  # [1] 21782
+saveRDS(refs_or, "edgelist_soc_env_sci_or")
+saveRDS(refs_and, "edgelist_soc_env_sci_and")
 
 ```
+
 
 
 Step 10) As part of considering whether or not to filter based on the different "primary_topic*" variables, I also wanted to assess the distribution of "Indigenous" specific language in both the title and primary topic.  Takeaway:  In the filtered works that appear in the unique list of references, there are 482 observations that have "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") in either the title or primary topic field - which equates to 0.88% of the works.  (In the full list of filtered references, including those not found in the overlapping references, there are 2860 observations - which equates to 2.8%.)  [see code in "02b" for exploration of this occurrence] 

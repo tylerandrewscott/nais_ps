@@ -285,7 +285,7 @@ n_distinct(works_filt_unique$primary_topic_subfield[works_filt_unique$primary_to
 n_distinct(works_filt_unique$primary_topic[works_filt_unique$primary_topic_field == "Social Sciences"])  # [1] 335
 
 
-# This seems worth doing for SEVERAL of the fields
+# The following seems worth doing for SEVERAL of the fields
 
 
 tally_source_socsci <- prim_field_socsci %>% 
@@ -324,16 +324,14 @@ write_excel_csv(tally_subfields, file = full_output_path_fields)
   
 fields_list <- c("Social Sciences", "Environmental Science")
 # fields_out <- c("socsci", "envsci")
+
 subfield_excel <- function(wf, field, odir) {
   fout <- gsub(" ","", field) %>% tolower() 
   var_string <- deparse(substitute(wf))
   
   filt_data <- filter(wf, primary_topic_field == field) %>% 
     group_by(primary_topic_subfield) %>% 
-    # count(primary_topic, sort = TRUE, name = "n_topics") %>% 
-    summarise(n_subfield = n()) # %>% 
-    # arrange(desc(n_subfield))
-    # mutate(n_subfields = count(primary_topic_subfield, )) # %>% 
+    summarise(n_subfield = n())  
     
   # write_excel_csv(filt_data, paste0(odir, fout, ".csv"))
   write_excel_csv(filt_data, paste0(odir, fout, var_string, ".csv"))

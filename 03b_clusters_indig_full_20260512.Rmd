@@ -49,8 +49,8 @@ getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
 # el_big <- readRDS(file = "data/edgelist_indig_or")  # 4603 observations of 2 variables
 # el_sm <- readRDS(file = "data/edgelist_indig_and")  # 727 observations of 2 variables
 
-cit_graph <- readRDS(file = "indig_cit_full.rds")
-cit_graph_ud <- readRDS(file = "indig_cit_full_ud.rds")
+cit_graph <- readRDS(file = "data/indig_cit_full.rds")
+cit_graph_ud <- readRDS(file = "data/indig_cit_full_ud.rds")
 
 ```
 
