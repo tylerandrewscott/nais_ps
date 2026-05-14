@@ -17,8 +17,10 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 ```{r libraries}
 
-# install.packages("pbapply")
-# install.packages("slam")
+install.packages(c("visNetwork", 
+                   "sfnetworks", 
+                   "tidygraph"))
+
 # install.packages("ggraph")
 # install.packages("udpipe")  
       # Tokenising, Lemmatising, Tagging and Dependency Parsing of raw text in TIF format
@@ -29,12 +31,15 @@ library(ggplot2)
 library(ggraph)
 library(igraph)
 library(knitr)
-library(Matrix)
-library(pbapply)
-library(slam)  # Sparse Lightweight Arrays and Matrices
+# library(Matrix)
+# library(pbapply)
+library(sfnetworks)
+# library(slam)  # Sparse Lightweight Arrays and Matrices
 library(stringr)
+library(tidygraph)
 library(tidyverse)
 library(udpipe)
+library(visNetwork)
 
 ```
 
@@ -72,69 +77,69 @@ The citation graph I'm starting with here "indig_clus_full" includes node modula
 Here I want to link the citation graph to the nodelist and then explore the combined dataset: descriptive statistics and network visualizations that display some of the node attributes.
 
 
-Step 1)  Add an attribute in the node-list for the cluster membership
+Step 1)  Add attributes in the node-list for the network characteristics:  cluster membership, page rank, and betweenness metrics.
        
        
-```{r 1) add cluster membership to node-list}
+```{r 1) add network attributes to node-list}
 
-# this block is essentially copy-pasted from Liza's code
+# this line is essentially copy-pasted from Liza's code
+# adds cluster number to each work
 
-M_dt$cluster <- V(cit_graph)$louv_cluster[match(M_dt$id,V(cit_graph)$name)]
+M_dt$cluster <- V(cit_graph)$louv_cluster[match(M_dt$work_id,V(cit_graph)$name)]
 
-table(M_dt$cluster)  # < table of extent 0 >
+table(M_dt$cluster)  
+
+# also want to find the works with the highest page rank and betweenness metrics
+
+M_dt$prank <- V(cit_graph)$prank[match(M_dt$work_id,V(cit_graph)$name)]
+M_dt$btw <- V(cit_graph)$betweenness[match(M_dt$work_id,V(cit_graph)$name)]
+M_dt$hi_btw <- V(cit_graph)$high_between[match(M_dt$work_id,V(cit_graph)$name)]
+M_dt$highest <- V(cit_graph)$highest_in_group[match(M_dt$work_id,V(cit_graph)$name)]
+
+# really don't need some of these original columns
+
+M_dt_new <- M_dt %>% 
+  select(-has_fulltext, -oa_is_oa, -oa_status)
+
+# class(M_dt_new)  # [1] "data.table" "data.frame"
+# typeof(M_dt_new)  # [1] "list"
+
+saveRDS(M_dt_new, "indig_full_nodelist.rds")
+# readRDS(file = "data/indig_full_nodelist.rds")
 
 ```
 
 
-Step 2) Identify clusters
-        a) Find connected components of the citation graph and visualize the network
-        b) For those components from the main cluster (with 69,041 elements out of 69,144), create subgraph
-        c) run clustering algorithm on the main cluster - start with Louvain
-        d) examine modularity
-        e) examine Page Rank estimates of citation importance
-    
-
-```{r 2a-big) find connected components of the larger graph}
-
-# this block is essentially copy-pasted from Liza's code
-  # changed "clu" to "clus"
-  # added some annotations
-
-# despite the "FALSE" result above for "is_connected" 
-# ran the "components" function using both "weak" and "strong" modes
-# the "weak" run yielded the same thing as not specifiying the mode, 
-# the "strong" run yielded 3250 clusters LOL!!!
- 
-
-clus_big <- components(cit_graph_big)  # List of 3: $ membership, $ csize, $ no
-str(clus_big)
-  # List of 3
-  # $ membership: Named num [1:3250] 1 1 1 1 1 1 1 1 1 1 ...
-    # ..- attr(*, "names")= chr [1:3250] "W1579625741" "W1995811201" ...
-  # $ csize     : num [1:25] 3013 15 14 10 6 ... ...
-  # $ no        : num 25
-
-# --- grouping/summarizing doesn't work --- "
-
-    # Error in UseMethod("group_by") : 
-        # no applicable method for 'group_by' applied to an object of class "list"
+Step 2) Explore the new node-list.
+  
+  * overall distribution of articles between the 3 sources
+  * group by cluster and summarize to compare average page rank and betweenness
+  * for each cluster, look at the primary_topic variables ==> FOR LOOP!!
 
 
-table(clus_big$membership)
+```{r 2) exploring the new node list}
 
-# 1       2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17   18   19 
-# 3013   15   14   10    6    7   10    6    7   10   12    9   11   11   12    6    6   17   18 
 
-#   20   21   22   23   24   25 
-#   12    9    7    9    7    6 
 
-# translation:  there are 25 clusters - 3013 elements are all in 1 cluster
-# meaning, need to compute the communities JUST using the elements in the main cluster
 
-connected_component_big <- names(clus_big$membership)[clus_big$membership == 1]
+```
 
-str(connected_component_big)  #  [1:3013]  
-    # --> which means 237 works were NOT INCLUDED in the main cluster (3250-3013)
+
+ Step 3) extracting information from the new node-list
+
+  * find the papers with the highest page-rank and betweenness metrics
+  * use "highest" variable to find the works in each group with the highest page-rank values
+  
+
+```{r 3) extracting specific works based on network}
+
+
+```
+
+
+Step 4) visualize the network and use different node attributes
+
+```{r 4) network visualization}
 
 # Got some visualization code from Sara!  
 
@@ -146,157 +151,6 @@ width = 0.3,
 arrow = arrow(angle = 15, length = unit(0.07, "inches"), ends = "last", type = "closed"))+
 geom_node_point(alpha = 0.2) +
 labs(title = "NAIS-themed Citations (full works)") + theme_void()
-
-```
-
-
-Before moving on, I tried figuring out a for-loop to get the cluster membership for each work_id.
-
-It didn't go well...need to come back to this.
-
-unconnecteds_names <- names(clus$membership)[clus$membership != 1]  #  chr [1:1729]
-    # can eventually use this list to find the "outliers"
-    # as Liza did
-
-clus_names <- names(clus$membership)[clus$membership != 1]
-clus_num <- clus$no
-
-cluster_list <- clus$membership
-
-
-
-cluster_assign <- for(i in cluster_list) {
-  which(clus$membership == i)
-}
-
-length(clus$membership)
-
-
-```{r 2b-big) create subgraph and undirected version}
-
-# this block is essentially copy-pasted from Liza's code
-  # changed "clu" to "clus" but no other changes
-
-if(any(clus_big$membership>1)){
-  cit_graph_big_main <- induced_subgraph(cit_graph_big,v = which(V(cit_graph_big)$name %in% connected_component_big))
-  cit_graph_big <- cit_graph_big_main
-}
-
-cit_graph_big_ud <- as.undirected(cit_graph_big, 'collapse')
-
-```
-
-
-```{r 2c-big) run clustering algorithm}
-
-# this block is essentially copy-pasted from Liza's code
-
-# recall that she had a much higher seed value under certain call conditions
-      # if(LOCATION == 'data/query_EG/' & ADD_SUPPL_WOS_REFS == F){
-        #  pref_seed <- 4812
-        #  } else{
-
-# will try running it with the set.seed set to 12 
-    # idea is to seed a pseudo random number generator using a reproducible seed 
-    # select 1000 numbers with equal weighting from the set 0:9999
-    # why do we need this?
-
-set.seed(12)  # Liza comment: # and 16 got to 8, dropped PES and joined it with PE
-seeds <- sample.int(9999, 1000)
-
-mod_big <- list()
-for(i in 1:length(seeds)){
-  set.seed(seeds[i])
-      # why is the clustering algo in the for-loop? 
-      # Not affected by iteration, move to outside of loop for efficiency
-  louv_indig_big <- cluster_louvain(cit_graph_big_ud)
-  mod_big$mod[i] <- modularity(louv_indig_big)
-  mod_big$min_n[i] <- min(table(louv_indig_big$membership))
-}
-mods <- unlist(mod_big$mod)
-min_ns <- unlist(mod_big$min_n)
-
-# saveRDS(louv_indig, "Louvain_indig")
-# louv <- readRDS(file = "data/Louvain_full")
-    
-head(mods)  # [1] 0.8170753 0.8162952 0.8183118 0.8163955 0.8195041 0.8157186
-tail(mods)  # [1] 0.8154065 0.8164846 0.8171450 0.8147561 0.8165310 0.8180804
-
-head(louv_indig_big$modularity)  # [1] 0.6202836 0.7887157 0.8178573 0.8180804
-tail(louv_indig_big$modularity)  # [1] 0.6202836 0.7887157 0.8178573 0.8180804
-
-```
-
-
-```{r 2d-big) examine modularity and degrees}
-
-# this block is essentially copy-pasted from Liza's code
-
-pref_seed <- seeds[which(mods == max(mods))]
-
-set.seed(pref_seed)  # Liza comment:  # 4262 with min size of 80, 2925 with min size of 30
-
-V(cit_graph_big_main)$louv_cluster <- louv_indig_big$membership
-
-# modularity measure
-    # B_ij = A_ij - γ k_i k_j / (2m)  == for UNDIRECTED graphs
-    # B_ij = A_ij - γ k^out_i k^in_j / m == for DIRECTED graphs
-
-modularity(louv_indig_big)
-B = modularity_matrix(cit_graph_big_main)
-
-
-# out-degree, in-degree, total-degree 
-
-summary(degree(cit_graph_big_main,mode = 'out'))
-  # Min.    1st Qu.  Median    Mean 3rd Qu.    Max. 
-  # 0.000    0.000   1.000   1.457   1.000  35.000 
-
-summary(degree(cit_graph_big_main,mode = 'in'))
-  #  Min.  1st Qu.   Median     Mean    3rd Qu.     Max. 
-  #  0.000   0.000   1.000      1.457   1.000     76.000
-
-summary(degree(cit_graph_big_main, mode = "all"))
-  #  Min. 1st Qu.  Median    Mean   3rd Qu.    Max. 
-  # 1.000   1.000   1.000   2.913   2.000     78.000 
-
-# Add network summary
-table(louv_indig_big$membership)
-mean(table(louv_indig_big$membership))  # [1] 100.4333
-median(table(louv_indig_big$membership))  # [1] 76
-min(table(louv_indig_big$membership))  # [1] 12
-max(table(louv_indig_big$membership))  # [1] 442
-
-```
-
-
-```{r e-big) PageRank measure of citation importance}
-
-prank <- page_rank(cit_graph_big)
-V(cit_graph_big)$prank <- unlist(as.vector(prank$vector))
-
-betw <- betweenness(cit_graph_big)
-V(cit_graph_big)$betweenness <- as.vector(betw)
-betw_group <- data.table(node = V(cit_graph_big)$name,
-                         between = betw,
-                         group = V(cit_graph_big_main)$louv_cluster)
-betw_group[,grank:=rank(-between,ties.method = 'average'),by=.(group)]
-
-
-V(cit_graph_big)$high_between <- V(cit_graph_big)$name %in% betw_group[grank<=4,]$node
-
-# Liza commented out the next line
-# V(cit_graph)[betw == max(betw)]
-
-prank_max <- data.table(node = V(cit_graph_big)$name,group = unlist(V(cit_graph_big_main)$louv_cluster),pagerank = unlist(V(cit_graph_big)$prank))
-prank_max_by_group <- prank_max[,max(pagerank),by=.(group)]
-
-max_by_group = dplyr::left_join(prank_max,prank_max_by_group)[pagerank==V1,]
-
-V(cit_graph_big)$highest_in_group <- V(cit_graph_big)$name %in% max_by_group$node
-
-saveRDS(cit_graph_big, "indig_cit_full.rds")
-# indig_cit_full <- readRDS(file = "data/indig_cit_full.rds")
 
 ```
 

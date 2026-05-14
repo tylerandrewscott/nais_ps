@@ -188,6 +188,10 @@ V(cit_graph)$high_between <- V(cit_graph)$name %in% betw_group[grank<=4,]$node
 # Liza commented out the next line
 # V(cit_graph)[betw == max(betw)]
 
+# ??
+    # in the code below, why do I have to unlist the louv_cluster (and prank) but I did NOT have to above???
+# ??
+
 prank_max <- data.table(node = V(cit_graph)$name,
                         group = unlist(V(cit_graph)$louv_cluster),
                         pagerank = unlist(V(cit_graph)$prank))
