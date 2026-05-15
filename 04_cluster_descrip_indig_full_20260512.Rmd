@@ -70,7 +70,14 @@ summary(cit_graph)  # List of 3013
 
 To Recap:
 
-I filtered the "works" to JUST those with NAIS-themed keywords in their title or primary_topic variables.  I found the "refs" that matched those work_ids - the resultant edgelist includes NAIS-themed works that appear in EITHER the "citing" ("from") or "cited" ("to") columns of the "refs" object.  That means they could be citing or cited by works that do NOT have NAIS-themed titles or primary-topics.  Using the edgelist, created a citation network and ran the Louvain clustering algorithm to identify clusters.  
+I filtered the "works" to JUST those with NAIS-themed keywords in their title or primary_topic variables.  I found the "refs" that matched those work_ids to produce two edgelists:  
+  * 1) the "full" edgelist includes NAIS-themed works that appear in EITHER the "citing" ("from") OR "cited" ("to") columns of the "refs" object. That means they could be citing or cited by works that do NOT have NAIS-themed titles or primary-topics.  
+  
+  * 2) the "insular" edgelist includes NAIS-themed works that were in BOTH the "citing" AND the "cited" columns of the refs object.  
+  
+Based on the unique references in the edgelist, I generated a nodelist by filtering the "works" to just those that appear in the edgelist.
+
+Using the edgelist, I created a citation network and ran the Louvain clustering algorithm to identify clusters.  
 
 The citation graph I'm starting with here "indig_clus_full" includes node modularity and betweenness centrality values, cluster membership, and 2 ranked measures of citation importance (page rank and grank).  
 
@@ -112,15 +119,104 @@ saveRDS(M_dt_new, "indig_full_nodelist.rds")
 
 Step 2) Explore the new node-list.
   
-  * overall distribution of articles between the 3 sources
-  * group by cluster and summarize to compare average page rank and betweenness
-  * for each cluster, look at the primary_topic variables ==> FOR LOOP!!
+  a) overall descriptions of works (journal source, source group, between the 3 sources
+  b) group by cluster and summarize to compare average page rank and betweenness
+  c) for each cluster, look at the primary_topic variables ==> FOR LOOP!!
 
 
-```{r 2) exploring the new node list}
+```{r 2a) overall works attributes list}
+
+# to generate the list of journals and how many times they appear
+
+journal_SID <- M_dt_new %>% 
+   group_by(primary_source_display_name) %>%
+   summarize(n = n()) %>% 
+   arrange(desc(n))
+
+# to see distribution of journals based on source group (NAIS, EP, or PS)
+
+
+sources <- M_dt_new %>% 
+  group_by(source_group) %>% 
+  summarise(n = n()) %>% 
+  mutate(pct = n/nrow(M_dt_new))
+
+```
+
+
+```{r 2b) cluster comparisons}
+
+clus_comp <- M_dt_new %>% 
+  group_by(cluster) %>% 
+  summarise(n_topics = n_distinct(primary_topic), 
+            prank_min = min(prank), 
+            prank_max = max(prank), 
+            prank_mean = mean(prank), 
+            btw_min = min(btw), 
+            btw_max = max(btw), 
+            btw_mean = mean(btw)) # %>% 
+
+tally_clusters <- M_dt_new %>% 
+  group_by(cluster) %>% 
+  summarise(n = n())
+
+clus_comp <- clus_comp %>% 
+  mutate(count = tally_clusters$n) # %>% 
+
+# test the above by looking at just one cluster and comparing against the summary table
+
+clus_comp_test <- M_dt_new %>% 
+  filter(cluster == 18)
+
+mean(clus_comp_test$prank)  # [1] 0.000275724
+min(clus_comp_test$prank)  # [1] 0.000183701
+max(clus_comp_test$prank)  # [1] 0.0005181134
+min(clus_comp_test$btw)  # [1] 0
+max(clus_comp_test$btw)  # [1] 18
+mean(clus_comp_test$btw)  # [1] 2
+n_distinct(clus_comp_test$primary_topic) # [1] 9
 
 
 
+
+```
+
+```{r 2c}
+
+# Looking at the distribution of the primary_topic variables before narrowing it down by "unique"
+
+n_distinct(M_dt_new$primary_topic)  # [1] 458
+n_distinct(M_dt_new$primary_topic_domain)  # [1] 5
+n_distinct(M_dt_new$primary_topic_field)  # [1] 20
+n_distinct(M_dt_new$primary_topic_subfield)  # [1] 105
+
+
+# how many unique NAIS-themed topics are there
+
+indig_topics <- M_dt_new %>% 
+  filter(str_detect(primary_topic, "Indigenous|indigenous|INDIGENOUS|Tribal|tribal|Tribe|tribe|Native")) %>% 
+  group_by(primary_topic) %>% 
+  summarise(n = n())
+
+
+# to get results from below into Excel:
+    # 1) use the "summarise" to get the full tally - copy to excel
+    # 2) comment out the summarize then run the rest of the operations - copy to excel
+
+tally_subfields <- M_dt_new %>% 
+  group_by(primary_topic_field) %>%
+  # summarise(n = n())
+    mutate(n_subfields = n_distinct(primary_topic_subfield)) %>% 
+  mutate(n_topics = n_distinct(primary_topic)) %>% 
+  select(primary_topic_field, n_subfields, n_topics) %>% 
+  distinct(primary_topic_field, .keep_all = TRUE)  # %>% 
+
+tally_indig <- M_dt_new %>% 
+  # filter(str_detect(primary_topic, "Indigenous|indigenous|INDIGENOUS|Tribal|tribal|Tribe|tribe|Native")) %>%  
+  filter(str_detect(title, "Indigenous|indigenous|INDIGENOUS|Tribal|tribal|Tribe|tribe|Native") | 
+    str_detect(primary_topic, "Indigenous|indigenous|INDIGENOUS|Tribal|tribal|Tribe|tribe|Native")) %>%
+  group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
+  summarise(n_Indig = n())
 
 ```
 

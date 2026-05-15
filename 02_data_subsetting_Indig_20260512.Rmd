@@ -11,7 +11,9 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
 ```{r libraries}
-library(ggplot2)
+
+# library(ggplot2)
+
 library(knitr)
 library(tidyverse)
 library(stringr)
@@ -86,7 +88,14 @@ Step 4) select out several variables
 
 # originally had this filtered to just "article" but based on Wood et al. (2025), decided to also keep "review", "book" and "book-chapter" 
 
-works_filt <- works %>% 
+# UPDATE 5/14/2026
+    # need to create a "works_filt" to use as a cross-over with the refs
+        # comment out the NAIS-themed filter and keep it as "works_filt"
+
+    # and ALSO create one that limits it to NAIS-themed works
+        # add the NAIS-themed filter back in and specify file as "works_filt_indig"
+
+works_filt_indig <- works %>% 
   filter(language == "en") %>% 
   filter(type == "article" | type == "review") %>%  # | type == "book" | type == "book-chapter") 
   filter(is_retracted == "FALSE") %>% 
@@ -96,7 +105,7 @@ works_filt <- works %>%
   filter(!is.na(fwci)) %>% 
   filter(referenced_works_count != 0) %>% 
   filter(str_detect(title, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native") | 
-           str_detect(primary_topic, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native")) %>%
+         str_detect(primary_topic, "Indigenous|indigenous|Tribal|tribal|Tribe|tribe|Native")) %>%
   select(-pmid, -mag, -publication_date, -language, -is_retracted, -is_paratext, -biblio_volume, -biblio_issue, -biblio_first_page, -biblio_last_page, -primary_source_type, -primary_source_issn_l, -created_date, -updated_date)
 
 
@@ -112,7 +121,9 @@ n_distinct(works_filt$is_paratext)  # [1] 1  Didn't filter by this variable, but
 # end result for now is 21 variables
     # could probably select out more, but want to look at more bibliometric analyses first
 
-saveRDS(works_filt, "works_filtered_indig")
+saveRDS(works_filt, "data/works_filtered.rds")
+saveRDS(works_filt_indig, "data/works_filtered_indig.rds")
+
 ```
 
 
@@ -125,7 +136,7 @@ Step 6) keep only those articles that were cited at least 5 times (per Wood et a
 Step 7) Once I have filtered it down to only those references with 5 or more citations, generate a list of just the unique values from both the "citing" and "cited" columns (as in, it's unique to BOTH columns). This step is NEW - before, I was limiting the refs to just those IDs that appeared as both citing and cited, but that would selectively miss older works that are part of the conversation (older articles CAN'T cite newer ones).
 
 
-```{r Step 5) subsetting the "refs" rds - removing self-references and loops}
+```{r Step 5) subsetting the "refs" rds - removing self-refs and loops}
 
 nrow(refs)  # [1] 634527
 
@@ -148,17 +159,23 @@ el <- refs_noselfs %>%
   # el2 <- el2[!index,] 
   # filter out those rows all at once
 
+# length(unique(el$from))  # [1] 81366
+# length(unique(el$to))  # [1] 75009
+
 loop_index <- which(paste(el$from, el$to) %in% paste(el$to, el$from))
 
 refs_clean <- el[!loop_index,]
 
-# checks if this approach worked:
+# checks to see if this approach worked:
   # length(loop_index)  # [1] 5636
   # nrow(refs_reduced)  # [1] 628422
-  # nrow(el2) - length(loop_index)  # [1] 628422 - IT WORKED!!
+  # nrow(el) - length(loop_index)  # [1] 628422 - IT WORKED!!
+
+length(unique(refs_clean$from))  # [1] 80883
+length(unique(refs_clean$to))  # [1] 74746
 
 
-saveRDS(refs_clean, "refs_clean")
+saveRDS(refs_clean, "data/refs_clean.rds")
 
 ```
 
@@ -185,25 +202,45 @@ refs_unique <- bind_rows(refs_citing_only_v2, refs_cited_only_v2) %>%
 
 n_distinct(refs_unique)  # [1] 56200
 
-saveRDS(refs_unique, "refs_unique")
+saveRDS(refs_unique, "data/refs_unique.rds")
 
 ```
 
 
-Step 8) Limit the "filt_works" to just those unique references in "refs"
+Step 8) Limit the "works_filt" to just those unique references in "refs"
+
+(This is to clean up the metadata/nodelist that will be attached to the network that is built using the refs as the edgelist.  If the "works" are not found in the edgelist, don't need them in the nodelist.)
 
 
 ```{r subsetting the filtered works to match the unique refs}
 
-works_indig_unique <- works_filt %>% 
+# UPDATE 5/14/2026
+    # need to create a "works_unique" to use as a cross-over with the refs
+        # comment out the NAIS-themed filter and keep it as "works_unique"
+
+    # and ALSO create one that limits it to NAIS-themed works
+        # add the NAIS-themed filter back in and specify file as "works_unique_indig"
+
+works_unique <- works_filt %>% 
   filter(work_id %in% refs_unique$citation)
 
-nrow(works_indig_unique) # [1] 473
-nrow(works_filt) - nrow(works_indig_unique)  # [1] 2481
+nrow(works_unique) # [1] 54575
+nrow(works_filt) - nrow(works_unique)  # [1] 48500
 
-print(count(works_indig_unique, is.na(work_id)))  # 1:          FALSE 473, no so "NA" values
+print(count(works_unique, is.na(work_id)))  # FALSE 54575, so no "NA" values
 
-# so, there are 2472 references in the "works" rds that 
+## ## ## ## 
+
+works_unique_indig <- works_filt_indig %>% 
+  filter(work_id %in% refs_unique$citation)
+
+nrow(works_unique_indig) # [1] 473
+nrow(works_filt) - nrow(works_unique_indig)  # [1] 102602
+nrow(works_filt_indig) - nrow(works_unique_indig)  # [1] 2481
+
+print(count(works_unique_indig, is.na(work_id)))  # 1:          FALSE 473, no so "NA" values
+
+# so, there are 2481 references in the "works" rds that 
 # DO contain the NAIS-relevant keywords, 
       # BUT will NOT be included in the network analysis
 
@@ -213,10 +250,16 @@ print(count(works_indig_unique, is.na(work_id)))  # 1:          FALSE 473, no so
 # But I want a separate one of the just the works that will be used for the network analysis
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name_indig_unique <- "Indigenous_unique_20260505.csv"
+file_name_indig_unique <- "Indigenous_unique_20260514.csv"
 full_output_path_fields <- file.path(output_directory, file_name_indig_unique)
 
-write_excel_csv(works_indig_unique, file = full_output_path_fields)
+write_excel_csv(works_unique_indig, file = full_output_path_fields)
+
+```
+
+```{r clean up the Environment}
+
+rm(refs_cited_only_v2, refs_citing_only_v2, refs_noselfs)
 
 ```
 
@@ -232,22 +275,27 @@ Will use "or" to get the broader landscape of conversation.  (If I use &, then I
 # this will find references that are NOT NAIS-themed but 
     # do reference or are referenced by one of the NAIS-themed works
 
+# MUST intersect the refs_clean with the UNIQUE works
+    # if you just use the "filtered" works,
+    # you'll get works that DO show up in the refs, 
+    # BUT were not referenced >= 5x
+
 refs_or <- refs_clean %>% 
-  filter((from %in% works_indig_unique$work_id) | (to %in% works_indig_unique$work_id))
+  filter((from %in% works_unique_indig$work_id) | (to %in% works_unique_indig$work_id))  # [1] 4603
 
 
 # this is a more insular approach - will include
     # only NAIS-themed works that reference or are referenced by other NAIS-themed works
 
 refs_and <- refs_clean %>% 
-  filter((from %in% works_indig_unique$work_id) & (to %in% works_indig_unique$work_id))
+  filter((from %in% works_unique_indig$work_id) & (to %in% works_unique_indig$work_id))  # [1] 727
 
 nrow(refs_or) - nrow(refs_and)   
   # [1] 3876 - the number of works for which either the "from" or "to" 
                   # do not ALSO use NAIS-keywords in the title or "primary_topic" field
 
-saveRDS(refs_or, "edgelist_indig_or")
-saveRDS(refs_and, "edgelist_indig_and")
+saveRDS(refs_or, "data/edgelist_indig_full.rds")
+saveRDS(refs_and, "data/edgelist_indig_insular.rds")
 
 
 ```
@@ -263,14 +311,12 @@ Step 10) Need to a) repeat the process of getting only unique values of the "ref
 
 refs_citing_only_or <- refs_or %>% 
   count(from, sort = TRUE, name = "tally") %>% 
-  # filter(tally >= 5) %>% 
   select(-tally, citation = from)
 
 n_distinct(refs_citing_only_or)  # [1] 1793
   
 refs_cited_only_or <- refs_or %>% 
   count(to, sort = TRUE, name = "tally") %>% 
-  # filter(tally >= 5) %>% 
   select(-tally, citation = to)
 
 n_distinct(refs_cited_only_or)  # [1] 1941
@@ -282,7 +328,7 @@ refs_unique_or <- bind_rows(refs_citing_only_or, refs_cited_only_or) %>%
 
 n_distinct(refs_unique_or)  # [1] 3250
 
-saveRDS(refs_unique_or, "refs_unique_Indig")
+# saveRDS(refs_unique_or, "data/refs_unique_Indig.rds")
 
 
 ```
@@ -290,14 +336,13 @@ saveRDS(refs_unique_or, "refs_unique_Indig")
 
 ```{r 10b) subsetting the filtered works to match the unique refs}
 
-works_indig_or <- works %>% 
-  filter(work_id %in% refs_unique_or$citation) %>% 
-  select(-pmid, -mag, -publication_date, -language, -is_retracted, -is_paratext, -biblio_volume, -biblio_issue, -biblio_first_page, -biblio_last_page, -primary_source_type, -primary_source_issn_l, -created_date, -updated_date)
+works_indig_or <- works_filt %>% 
+  filter(work_id %in% refs_unique_or$citation) 
 
-saveRDS(works_indig_or, "nodelist_Indig_full.rds")
+saveRDS(works_indig_or, "data/nodelist_Indig_full.rds")
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name_indig_or <- "Nodelist_Indig_full_20260512.csv"
+file_name_indig_or <- "Nodelist_Indig_full_20260514.csv"
 full_output_path_fields <- file.path(output_directory, file_name_indig_or)
 
 write_excel_csv(works_indig_or, file = full_output_path_fields)
