@@ -1,0 +1,207 @@
+---
+title: "03b.2_clusters_indig_insular"
+author: "Mackenzie Johnson"
+date: "2026-10-02"
+output: html_document
+---
+
+  
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+# knitr::opts_chunk$set(eval = FALSE)
+# knitr::opts_chunk$set(include = FALSE)
+
+```
+
+```{r libraries}
+
+# install.packages("pbapply")
+# install.packages("slam")
+# install.packages("ggraph")
+
+library(data.table)
+library(ggplot2)
+library(ggraph)
+library(igraph)
+library(knitr)
+library(Matrix)
+library(pbapply)
+library(slam)
+library(stringr)
+library(tidyverse)
+
+```
+
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData}
+
+# citation networks from 3a.2
+
+cit_graph <- readRDS(file = "data/indig_cit_insular.rds")
+cit_graph_ud <- readRDS(file = "data/indig_cit_insular_ud.rds")
+
+
+```
+
+[5/12/2026
+
+This is a continuation from 3a, where I generated the citation network, visualized it, and generated an undirected version for use in the clustering algorithm.]
+
+Step 3) Identify clusters
+        a) run clustering algorithm on the main cluster - start with Louvain
+        b) examine modularity and betweenness metrics
+        c) examine Page Rank estimates of citation importance
+    
+
+```{r 3a-insular) run clustering algorithm}
+
+# this block is essentially copy-pasted from Liza's code
+
+# recall that she had a much higher seed value under certain call conditions
+      # if(LOCATION == 'data/query_EG/' & ADD_SUPPL_WOS_REFS == F){
+        #  pref_seed <- 4812
+        #  } else{
+
+# will try running it with the set.seed set to 12 
+    # idea is to seed a pseudo random number generator using a reproducible seed 
+    # select 1000 numbers with equal weighting from the set 0:9999
+    # why do we need this?
+
+set.seed(12)  # Liza comment: # and 16 got to 8, dropped PES and joined it with PE
+seeds <- sample.int(9999, 1000)
+
+# run this next block ("mod_indig_..." through the "min_ns" line) all together
+
+mod_indig_insular <- list()
+for(i in 1:length(seeds)){
+  set.seed(seeds[i])
+  louv_indig_insular <- cluster_louvain(cit_graph_ud)
+  mod_indig_insular$mod[i] <- modularity(louv_indig_insular)
+  mod_indig_insular$min_n[i] <- min(table(louv_indig_insular$membership))
+}
+mods <- unlist(mod_indig_insular$mod)
+min_ns <- unlist(mod_indig_insular$min_n)
+
+saveRDS(louv_indig_insular, "data/Louvain_indig_insular.rds")
+# louv <- readRDS(file = "data/Louvain_insular.rds")
+    
+head(mods)  # [1] 0.7303444 0.7300595 0.7312589 0.7315345 0.7353091 0.7250091
+tail(mods)  # [1] 0.7280509 0.7299160 0.7298871 0.7317099 0.7287197 0.7319473
+
+head(louv_indig_insular$modularity)  # 0.5733842 0.7236466 0.7319473
+tail(louv_indig_insular$modularity)  # 0.5733842 0.7236466 0.7319473
+
+```
+
+
+```{r 3b-insular) examine modularity and betweenness metrics}
+
+# this block is essentially copy-pasted from Liza's code
+
+pref_seed <- seeds[which(mods == max(mods))]
+
+set.seed(pref_seed)  # Liza comment:  # 4262 with min size of 80, 2925 with min size of 30
+
+V(cit_graph)$louv_cluster <- louv_indig_insular$membership
+
+# modularity measure
+    # B_ij = A_ij - γ k_i k_j / (2m)  == for UNDIRECTED graphs
+    # B_ij = A_ij - γ k^out_i k^in_j / m == for DIRECTED graphs
+
+modularity(louv_indig_insular)
+B = modularity_matrix(cit_graph)
+
+
+# out-degree, in-degree, total-degree 
+
+summary(degree(cit_graph,mode = 'out'))
+  # Min.    1st Qu.  Median  Mean    3rd Qu.    Max. 
+  # 0.000   0.000    1.000   1.955   3.000      10.000 
+
+summary(degree(cit_graph,mode = 'in'))
+  # Min.    1st Qu.  Median  Mean    3rd Qu.    Max. 
+  # 0.000   0.000    1.000   1.955   3.000      26.000  
+
+summary(degree(cit_graph, mode = "all"))
+  # Min.    1st Qu.  Median  Mean    3rd Qu.    Max. 
+  # 1.00    2.00     3.00    3.91    5.00       26.00  
+
+# Add network summary
+table(louv_indig_insular$membership)
+mean(table(louv_indig_insular$membership))  # [1] 27.38462
+median(table(louv_indig_insular$membership))  # [1] 31
+min(table(louv_indig_insular$membership))  # [1] 7
+max(table(louv_indig_insular$membership))  # [1] 41
+
+```
+
+
+For line 179 below:  AI Overview         
+This code is written in R using the data.table package. It creates a new column named grank in the data table betw_group, which assigns a rank to rows based on the values in the between column.
+
+Here is a breakdown of the code "betw_group[, grank := rank(-between, ties.method = 'average')]"
+
+Detailed Breakdown
+  * betw_group[...]: This indicates an operation on the data.table named betw_group.
+  * grank :=: The := operator is used in data.table for in-place assignment. It creates a new column named grank (or updates it if it exists) without making a copy of the entire data frame.
+  * rank(...): This is the R function used to calculate ranks.
+  * -between: The minus sign indicates that the ranking is done in descending order (highest value gets rank 1).
+  * ties.method = 'average': This dictates how to handle ties (cases where between has identical values). The "average" method assigns the mean of the ranks that the tied values would have received. For example, if two values are tied for 2nd and 3rd place, both receive a rank of \(2.5\).
+
+Summary of Result
+The grank column will contain numeric values representing the rank of the between column, where the highest value is ranked 1, with average ranks assigned to ties.
+
+Note: For faster, more efficient ranking in data.table (especially with large datasets), frank is often used instead of rank.
+
+
+
+```{r 3c-insular) PageRank measure of citation importance}
+
+prank <- page_rank(cit_graph)
+V(cit_graph)$prank <- unlist(as.vector(prank$vector))
+
+betw <- betweenness(cit_graph)
+V(cit_graph)$betweenness <- as.vector(betw)
+betw_group <- data.table(node = V(cit_graph)$name,
+                         between = betw,
+                         group = V(cit_graph)$louv_cluster)
+betw_group[,grank:=rank(-between,ties.method = 'average'),by=.(group)]
+
+# when using "data.table" package, 
+# don't have to re-store or re-assign variable
+    # so the code above DOES create a column for "grank" even though it doesn't look like it
+        # (which is why the next line is able to call it)
+
+V(cit_graph)$high_between <- V(cit_graph)$name %in% betw_group[grank<=4,]$node
+
+# Liza commented out the next line
+# V(cit_graph)[betw == max(betw)]
+
+# ??
+    # in the code below, why do I have to unlist the louv_cluster (and prank) but I did NOT have to above???
+# ??
+
+prank_max <- data.table(node = V(cit_graph)$name,
+                        group = unlist(V(cit_graph)$louv_cluster),
+                        pagerank = unlist(V(cit_graph)$prank))
+
+prank_max_by_group <- prank_max[,max(pagerank),by=.(group)]
+
+max_by_group = dplyr::left_join(prank_max,prank_max_by_group)[pagerank==V1,]
+
+V(cit_graph)$highest_in_group <- V(cit_graph)$name %in% max_by_group$node
+
+saveRDS(cit_graph, "data/indig_insular_clusters.rds")
+# indig_cit_insular <- readRDS(file = "data/indig_insular_clusters.rds")
+
+```
+

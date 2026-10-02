@@ -1,0 +1,205 @@
+---
+title: "03a.1_networks_indig_open"
+author: "Mackenzie Johnson"
+date: "2026-10-02"
+output: html_document
+---
+
+  
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+# knitr::opts_chunk$set(eval = FALSE)
+# knitr::opts_chunk$set(include = FALSE)
+
+```
+
+```{r libraries}
+
+# install.packages("pbapply")
+# install.packages("slam")
+# install.packages("ggraph")
+
+library(data.table)
+library(ggplot2)
+library(ggraph)
+library(igraph)
+library(knitr)
+library(Matrix)
+library(pbapply)
+library(slam)
+library(stringr)
+library(tidyverse)
+
+```
+
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData}
+
+# edgelists
+
+el_big <- readRDS(file = "data/edgelist_indig_open_20261001.rds")  # 4455 observations of 2 variables
+# el_sm <- readRDS(file = "data/edgelist_indig_insular_20261001.rds")  # 724 observations of 2 variables
+
+```
+
+[UPDATE:  4/27/2026 and 5/12/2016
+
+Started trying to make sense of the network again now that I have a new edgelist.  I brought the clustering algorithm out of the for-loop.  Made it through 2c.]
+
+
+Step 1)  Create a citation graph following Wood et al. (2025) - code is available in Liza Wood's Github repository "tamar"
+        a) start with a full graph
+        b) simplify it by removing any multiple edges or loop edges - BUT!  WARNING!  Elise says "simplify" is notoriously wonky
+        c) test if it's "connected"
+
+        
+Regarding "is_connected()"
+
+From "networkx.org" documentation for doing network analysis in Python:
+  * "A graph is connected if, for every pair of distinct nodes, there is a path between them. If there is a pair of nodes for which such path does not exist, the graph is not connected (also referred to as “disconnected”)"
+
+From github:  https://olizardo.github.io/networks-textbook/lesson-graphs-connectivity.html
+  * "A graph is CONNECTED if there exists a (finite) path between each pair of nodes.  A graph is DISCONNECTED if there does not exist a path connecting every pair of nodes"
+  
+From github:  https://yunranchen.github.io/intro-net-r/igraph.html
+  * "Connected: if there is a path from any vertex to any other.  Unconnected: if not connected. An unconnected graph has multiple components." 
+       
+       
+```{r 1-big) create initial citation graph}
+
+# this block is essentially copy-pasted from Liza's code
+  # only difference is I added some annotations
+
+# this run is for articles with NAIS-themed titles or primary_topic
+    # in the FULL list of works (after filtering/before limiting to the unique refs)
+    # meaning: these works might reference works that do NOT have NAIS-themed titles or topics
+
+
+cit_graph_indig_open <- graph_from_edgelist(as.matrix(el_big), directed = T)  # List of 3170
+
+# str(cit_graph_big)
+
+
+cit_graph_indig_open <- igraph::simplify(cit_graph_indig_open, remove.multiple = T, remove.loops = T)
+  # remove.multiple	Logical, whether the multiple edges are to be removed
+  # remove.loops	Logical, whether the loop edges are to be removed
+
+
+# Liza didn't do this next step, but I want to check
+
+is_connected(cit_graph_indig_open, mode = "weak")  # [1] FALSE
+
+# FALSE means that it is disconnected (meaning, there are gaps between some of the nodes)
+
+count_components(cit_graph_indig_full)  # [1] 25 --- matches component details in the next chunk
+
+# to get a histogram for the maximal connected component sizes: 
+  # component_distribution(cit_graph_indig_full)
+
+```
+
+
+Step 2) Network components ("maximal induced subgraph that is connected")
+        a) Find connected components of the citation graph and visualize the network
+        b) For those components from the main cluster (with 69,041 elements out of 69,144), create subgraph
+
+[In the next workflow segment:]
+Step 3) a) run clustering algorithm on the main cluster - start with Louvain
+        b) examine modularity
+        c) examine Page Rank estimates of citation importance
+    
+
+```{r 2a-big) find connected components of the larger graph}
+
+# this will be easier if I rename the citation graph
+
+cit_graph <- cit_graph_indig_open
+
+# this block is essentially copy-pasted from Liza's code
+  # changed "clu" to "comps"
+  # added some annotations
+
+# despite the "FALSE" result above for "is_connected" 
+# ran the "components" function using both "weak" and "strong" modes
+    # the "weak" run yielded the same thing as not specifying the mode, 
+    # the "strong" run yielded 3250 clusters - seems like a Directed Acyclic Graph (?)
+ 
+
+comps_indig_open <- components(cit_graph, mode = "weak")  # List of 3: $ membership, $ csize, $ no
+str(comps_indig_open)
+  # List of 3
+  # $ membership: Named num [1:3170] 1 1 1 1 1 1 1 1 1 1 ...
+    # ..- attr(*, "names")= chr [1:3170] "W1579625741" "W1995811201" "W2123089587" "W150613307"  ...
+  # $ csize     : num [1:25] 2936 15 14 10 6 ..
+  # $ no        : num 25
+
+# --- grouping/summarizing doesn't work --- #
+
+    # Error in UseMethod("group_by") : 
+        # no applicable method for 'group_by' applied to an object of class "list"
+
+
+table(comps_indig_open$membership)
+
+#   1     2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17   18   19   20   21   22 
+# 2936   15   14   10    6    7   10    6    7    8   11    9   11   11   12    6    6   17   18   12    9    7 
+ 
+#  23   24   25 
+#   9    7    6 
+
+# translation:  there are 25 clusters - 2936 elements are all in 1 cluster
+# meaning, need to compute the communities JUST using the elements in the main cluster
+
+connected_indig_open <- names(comps_indig_open$membership)[comps_indig_open$membership == 1]
+
+str(connected_indig_open)  #  [1:2936]  
+    # --> which means 234 works were NOT INCLUDED in the main cluster (= 3170-2936)
+
+# Got some visualization code from Sara!  
+
+ggraph(cit_graph, layout = "kk") +
+geom_edge_fan(
+end_cap = circle(1, "mm"),
+color = "#000000",
+width = 0.3,
+arrow = arrow(angle = 15, length = unit(0.07, "inches"), ends = "last", type = "closed"))+
+geom_node_point(alpha = 0.2) +
+labs(title = "NAIS-themed Citations (open network)") + theme_void()
+
+```
+
+
+```{r 2b-big) create subgraph and undirected version}
+
+# this block is essentially copy-pasted from Liza's code
+  # changed "clu" to "comps" but no other changes
+
+# the following code is for extracting the main blob, 
+# but I also want to see what happens when I run it on the full network
+    # especially given that it seems like there are multiple clusters when I plotted the network 
+
+if(any(comps_indig_open$membership>1)){
+  cit_graph_main <- induced_subgraph(cit_graph,v = which(V(cit_graph)$name %in% connected_indig_open))
+  cit_graph <- cit_graph_main
+}
+
+cit_graph_ud <- as.undirected(cit_graph, 'collapse')
+
+
+# save the citation graph network
+saveRDS(cit_graph, "data/indig_cit_open.rds")
+
+# save the undirected citation graph network for use in clustering
+saveRDS(cit_graph_ud, "data/indig_cit_open_ud.rds")
+
+```
+

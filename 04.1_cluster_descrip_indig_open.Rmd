@@ -1,0 +1,254 @@
+---
+title: "04.1_cluster_descrip_indig_open_20261002"
+author: "Mackenzie Johnson"
+date: "2026-10-02"
+output: html_document
+---
+
+  
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+# knitr::opts_chunk$set(eval = FALSE)
+# knitr::opts_chunk$set(include = FALSE)
+
+```
+
+```{r libraries}
+
+install.packages(c("visNetwork", 
+                   "sfnetworks", 
+                   "tidygraph"))
+
+# install.packages("ggraph")
+# install.packages("udpipe")  
+      # Tokenising, Lemmatising, Tagging and Dependency Parsing of raw text in TIF format
+
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(ggraph)
+library(igraph)
+library(knitr)
+# library(Matrix)
+# library(pbapply)
+library(sfnetworks)
+# library(slam)  # Sparse Lightweight Arrays and Matrices
+library(stringr)
+library(tidygraph)
+library(tidyverse)
+library(udpipe)
+library(visNetwork)
+
+```
+
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData}
+
+# nodelist (aka "metadata")
+
+met <- readRDS(file = "data/nodelist_indig_full_v2.rds")
+
+# citation graph - with data from cluster algorithm
+# based on "indig_cit_open"
+
+cit_graph <- readRDS(file = "data/indig_open_clusters.rds")
+
+dim(met)  # [1] 3170   21
+summary(cit_graph)  # List of 2936
+
+# difference is the 234 "unconnected" components
+
+```
+
+To Recap:
+
+I filtered the "works" to JUST those with NAIS-themed keywords in their title or primary_topic variables.  I found the "refs" that matched those work_ids to produce two edgelists:  
+  * 1) the "full" edgelist includes NAIS-themed works that appear in EITHER the "citing" ("from") OR "cited" ("to") columns of the "refs" object. That means they could be citing or cited by works that do NOT have NAIS-themed titles or primary-topics.  
+  
+  * 2) the "insular" edgelist includes NAIS-themed works that were in BOTH the "citing" AND the "cited" columns of the refs object.  
+  
+Based on the unique references in the edgelist, I generated a nodelist by filtering the "works" to just those that appear in the edgelist.
+
+Using the edgelist, I created a citation network and ran the Louvain clustering algorithm to identify clusters.  
+
+The citation graph I'm starting with here "indig_clus_full" includes node modularity and betweenness centrality values, cluster membership, and 2 ranked measures of citation importance (page rank and grank).  
+
+Here I want to link the citation graph to the nodelist and then explore the combined dataset: descriptive statistics and network visualizations that display some of the node attributes.
+
+
+Step 1)  Add attributes in the node-list for the network characteristics:  cluster membership, page rank, and betweenness metrics.
+       
+       
+```{r 1) add network attributes to node-list}
+
+# this line is essentially copy-pasted from Liza's code
+# adds cluster number to each work
+
+met$cluster <- V(cit_graph)$louv_cluster[match(met$work_id,V(cit_graph)$name)]
+
+table(met$cluster)
+
+# also want to find the works with the highest page rank and betweenness metrics
+
+met$prank <- V(cit_graph)$prank[match(met$work_id,V(cit_graph)$name)]
+met$btw <- V(cit_graph)$betweenness[match(met$work_id,V(cit_graph)$name)]
+met$hi_btw <- V(cit_graph)$high_between[match(met$work_id,V(cit_graph)$name)]
+met$highest <- V(cit_graph)$highest_in_group[match(met$work_id,V(cit_graph)$name)]
+
+# really don't need some of these original columns
+
+met_full <- met %>% 
+  select(-has_fulltext, -oa_is_oa, -oa_status)
+
+# class(met_full)  # [1] "data.table" "data.frame"
+# typeof(met_full)  # [1] "list"
+
+saveRDS(met_full, "data/4_indig_full_nodelist.rds")
+# readRDS(file = "data/indig_full_nodelist.rds")
+
+```
+
+
+Step 2) Explore the new node-list.
+  
+  a) overall descriptions of works (journal source, source group, between the 3 sources
+  b) group by cluster and summarize to compare average page rank and betweenness
+  c) for each cluster, look at the primary_topic variables ==> FOR LOOP!!
+
+
+```{r 2a) overall works attributes list}
+
+# to generate the list of journals and how many times they appear
+
+journal_SID <- met_full %>% 
+   group_by(primary_source_display_name) %>%
+   summarize(n = n()) %>% 
+   arrange(desc(n))
+
+# to see distribution of journals based on source group (NAIS, EP, or PS)
+
+
+sources <- met_full %>% 
+  group_by(source_group) %>% 
+  summarise(n = n()) %>% 
+  mutate(pct = n/nrow(met_full))
+
+```
+
+
+```{r 2b) cluster comparisons}
+
+clus_comp <- met_full %>% 
+  group_by(cluster) %>% 
+  summarise(n = n(), 
+            n_topics = n_distinct(primary_topic), 
+            prank_min = min(prank), 
+            prank_max = max(prank), 
+            prank_mean = mean(prank), 
+            btw_min = min(btw), 
+            btw_max = max(btw), 
+            btw_mean = mean(btw)) 
+
+# test the above by looking at just one cluster and comparing against the summary table
+
+clus_comp_test <- met_full %>% 
+  filter(cluster == 21)
+
+n_distinct(clus_comp_test$primary_topic) # [1] 9
+min(clus_comp_test$prank)  # [1] 0.0001901231
+max(clus_comp_test$prank)  # [1] 0.000233346
+mean(clus_comp_test$prank)  # [1] 0.0002112124
+min(clus_comp_test$btw)  # [1] 0
+max(clus_comp_test$btw)  # [1] 6
+mean(clus_comp_test$btw)  # [1] 0.4285714
+
+
+
+
+
+```
+
+```{r 2c}
+
+# Looking at the distribution of the primary_topic variables before narrowing it down by "unique"
+
+n_distinct(met_full$primary_topic)  # [1] 454
+n_distinct(met_full$primary_topic_domain)  # [1] 4
+n_distinct(met_full$primary_topic_field)  # [1] 19
+n_distinct(met_full$primary_topic_subfield)  # [1] 104
+
+
+# how many unique NAIS-themed topics are there
+
+indig_topics <- met_full %>% 
+  filter(str_detect(primary_topic,"Indigenous|indigenous|INDIGENOUS|Tribal|tribal|TRIBAL|Tribe|tribe|TRIBE|Native")) %>% 
+  group_by(primary_topic) %>% 
+  summarise(n = n())
+
+# note that including TRIBAL and TRIBE does not change the numbers
+
+# to get results from below into Excel:
+    # 1) use the "summarise" to get the full tally - copy to excel
+    # 2) comment out the summarize then run the rest of the operations - copy to excel
+
+tally_subfields <- met_full %>% 
+  group_by(primary_topic_field) %>%
+  summarise(n = n(), 
+            n_subfields = n_distinct(primary_topic_subfield),
+            n_topics = n_distinct(primary_topic), 
+            n_indig = n()) %>% 
+  select(primary_topic_field, n, n_subfields, n_topics)  
+
+tally_indig <- met_full %>% 
+  filter(str_detect(primary_topic, "Indigenous|indigenous|INDIGENOUS|Tribal|tribal|Tribe|tribe|Native")) %>%  
+  # filter(str_detect(title, "Indigenous|indigenous|INDIGENOUS|Tribal|tribal|Tribe|tribe|Native") | 
+    #str_detect(primary_topic, "Indigenous|indigenous|INDIGENOUS|Tribal|tribal|Tribe|tribe|Native")) %>%
+  group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
+  summarise(n_Indig = n())
+
+```
+
+
+ Step 3) extracting information from the new node-list
+
+  * find the papers with the highest page-rank and betweenness metrics
+  * use "highest" variable to find the works in each group with the highest page-rank values
+  
+
+```{r 3) extracting specific works based on network}
+
+imp_works_full_ish <- met_full %>% 
+  filter(hi_btw == "TRUE")
+
+imp_works_full <- met_full %>% 
+  filter(highest == "TRUE")
+
+```
+
+
+Step 4) visualize the network and use different node attributes
+
+```{r 4) network visualization}
+
+# Got some visualization code from Sara!  
+
+ggraph(cit_graph_big, layout = "fr") +
+geom_edge_fan(
+end_cap = circle(1, "mm"),
+color = "#000000",
+width = 0.3,
+arrow = arrow(angle = 15, length = unit(0.07, "inches"), ends = "last", type = "closed"))+
+geom_node_point(alpha = 0.2) +
+labs(title = "NAIS-themed Citations (open network)") + theme_void()
+
+```
+
