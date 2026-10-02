@@ -50,6 +50,7 @@ works_unique_indig <- readRDS(file = "data/works_unique_indig_20261001.rds")
 refs_or_unique <- readRDS(file = "data/refs_unique_indig_20261001.rds")
 
 works_indig_or <- readRDS(file = "data/nodelist_indig_open_20261001.rds")
+works_indig_and <- readRDS(file = "data/nodelist_indig_insular_20261001.rds")
 
 ```
 
@@ -431,10 +432,10 @@ nrow(refs_and_unique) - nrow(works_indig_and)  # [1] 0
 saveRDS(works_indig_and, "data/nodelist_indig_insular_20261001.rds")
 
 output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
-file_name_indig_or <- "Nodelist_Indig_insular_20261001.csv"
-full_output_path <- file.path(output_directory, file_name_indig_or)
+file_name_indig_and <- "Nodelist_Indig_insular_20261001.csv"
+full_output_path <- file.path(output_directory, file_name_indig_and)
 
-write_excel_csv(works_indig_or, file = full_output_path)
+write_excel_csv(works_indig_and, file = full_output_path)
 
 ```
 
