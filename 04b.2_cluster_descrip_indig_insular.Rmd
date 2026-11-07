@@ -1,0 +1,274 @@
+---
+title: "04b.2_cluster_descrip_indig_insular"
+author: "Mackenzie Johnson"
+date: "2026-11-05"
+output: html_document
+---
+
+  
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+# knitr::opts_chunk$set(eval = FALSE)
+# knitr::opts_chunk$set(include = FALSE)
+
+```
+
+```{r libraries}
+
+# install.packages(c("visNetwork", 
+  #                  "sfnetworks", 
+    #                "tidygraph"))
+
+# install.packages("ggraph")
+# install.packages("udpipe")  
+      # Tokenising, Lemmatising, Tagging and Dependency Parsing of raw text in TIF format
+
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(ggraph)
+library(igraph)
+library(knitr)
+# library(Matrix)
+# library(pbapply)
+library(sfnetworks)
+# library(slam)  # Sparse Lightweight Arrays and Matrices
+library(stringr)
+library(tidygraph)
+library(tidyverse)
+library(udpipe)
+library(visNetwork)
+
+```
+
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData}
+
+# nodelist (aka "metadata")
+
+met_insular <- readRDS(file = "data/4a.2_indig_insular_nodelist.rds")
+
+```
+
+In step 4, I'm going to investigate the clusters identified by the clustering algorithm.  
+ - How similar or dissimilar are they with respect to the primary topics (and the fields and subfields to which those topics belong) 
+ - What are the most important works for each cluster based on page rank and betweenness.
+ 
+To simplify this process, 
+ 
+Workflow:
+Step 1)  Add attributes in the node-list for the network characteristics:  cluster membership, page rank, and betweenness metrics.  [This was done in "04a_cluster_nodelists.rmd".]
+
+Step 2) Explore the new node-list.
+  
+  a) overall descriptions of works (journal source, source group)
+  b) group by cluster and summarize to compare average page rank and betweenness
+  c) for each cluster, look at the primary_topic variables ==> FOR LOOP!!
+  
+Step 3) extract the most important works
+
+To Recap:
+
+I filtered the "works" to JUST those with NAIS-themed keywords in their title or primary_topic variables.  I found the "refs" that matched those work_ids to produce two edgelists:  
+  * 1) the "open" edgelist includes NAIS-themed works that appear in EITHER the "citing" ("from") OR "cited" ("to") columns of the "refs" object. That means they could be citing or cited by works that do NOT have NAIS-themed titles or primary-topics.  
+  
+  * 2) the "insular" edgelist includes NAIS-themed works that were in BOTH the "citing" AND the "cited" columns of the refs object.  
+  
+Based on the unique references in the edgelist, I generated a nodelist by filtering the "works" to just those that appear in the edgelist.
+
+Using the edgelist, I created a citation network and ran the Louvain clustering algorithm to identify clusters.  
+
+The citation graph I'm starting with here "indig_clus_insular" includes node modularity and betweenness centrality values, cluster membership, and 2 ranked measures of citation importance (page rank and grank).  
+
+Here I want to link the citation graph to the nodelist and then explore the combined dataset: descriptive statistics and network visualizations that display some of the node attributes.
+
+  
+
+```{r 2a.1) exploring the new nodelist - journals and source groups}
+
+# to generate the list of journals and how many times they appear
+
+journal_SID <- met_insular %>% 
+   group_by(primary_source_display_name) %>%
+   summarize(n = n()) %>%
+   mutate(pct = n/nrow(met_insular)) |> 
+   arrange(-n)
+
+## ##
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "journals_insular_20261106.csv"
+full_output_path <- file.path(output_directory, file_name)
+
+write_excel_csv(journal_SID, file = full_output_path)
+
+## ## ## 
+
+# to see distribution of journals based on source group (NAIS, EP, or PS)
+
+source_groups <- met_insular %>% 
+  group_by(source_group) %>% 
+  summarise(n = n()) %>% 
+  mutate(pct = n/nrow(met_insular)) |> 
+  arrange(-n)
+
+## ##
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "source_groups_insular_20261106.csv"
+full_output_path <- file.path(output_directory, file_name)
+
+write_excel_csv(source_groups, file = full_output_path)
+
+```
+
+
+```{r 2a.2) distribution of primary topics}
+
+# Looking at the distribution of the primary_topic variables
+
+n_distinct(met_insular$primary_topic)  # [1] 75
+n_distinct(met_insular$primary_topic_domain)  # [1] 4
+n_distinct(met_insular$primary_topic_field)  # [1] 12
+n_distinct(met_insular$primary_topic_subfield)  # [1] 35
+
+## ## 
+
+# this code produces an overview of the 12 primary topic fields
+
+tally_subfields <- met_insular %>% 
+  group_by(primary_topic_field) %>%
+  summarise(n = n(), 
+            n_subfields = n_distinct(primary_topic_subfield),
+            n_topics = n_distinct(primary_topic)) |> 
+  select(primary_topic_field, n, n_subfields, n_topics) |> 
+  arrange(-n)
+
+## ## 
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "Primary_Topic_Fields_insular_20261106.csv"
+full_output_path <- file.path(output_directory, file_name)
+
+write_excel_csv(tally_subfields, file = full_output_path)
+
+## ##
+
+#  this code produces a similar overview of the primary topic fields
+    # but only when the primary topic is NAIS-specific
+
+tally_indig <- met_insular %>% 
+  filter(str_detect(primary_topic, "Indigenous|indigenous|INDIGENOUS|Tribal|tribal|Tribe|tribe|Native")) %>%  
+  group_by(primary_topic_field) %>%  # group_by(primary_topic_field)
+  summarise(n_Indig = n(), 
+            n_subfields = n_distinct(primary_topic_subfield),
+            n_topics = n_distinct(primary_topic), 
+            n_indig = n()) %>% 
+  select(primary_topic_field, n_Indig, n_subfields, n_topics) |> 
+  arrange(-n_Indig)
+
+## ## 
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "Primary_Topic_Fields_Indig_insular_20261106.csv"
+full_output_path <- file.path(output_directory, file_name)
+
+write_excel_csv(tally_indig, file = full_output_path)
+
+## ## 
+
+# from the above, can see there are n = 9 NAIS-specific topics
+# this code produces a frequency table of the 9 topics 
+
+indig_topics_insular <- met_insular %>% 
+  filter(str_detect(primary_topic,"Indigenous|indigenous|INDIGENOUS|Tribal|tribal|TRIBAL|Tribe|tribe|TRIBE|Native")) %>% 
+  group_by(primary_topic) %>% 
+  summarise(n = n()) |> 
+  arrange(-n)
+
+# note that including TRIBAL and TRIBE does not change the numbers
+
+## ## 
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "Primary_Topics_Indig_insular_20261106.csv"
+full_output_path <- file.path(output_directory, file_name)
+
+write_excel_csv(indig_topics_insular, file = full_output_path)
+
+```
+
+
+```{r 2b) cluster comparisons}
+
+clus_comp <- met_insular %>% 
+  group_by(cluster) %>% 
+  summarise(n = n(), 
+            n_topics = n_distinct(primary_topic), 
+            n_subfields = n_distinct(primary_topic_subfield),
+            prank_min = min(prank), 
+            prank_max = max(prank), 
+            prank_mean = mean(prank), 
+            btw_min = min(btw), 
+            btw_max = max(btw), 
+            btw_mean = mean(btw)) 
+
+# test the above by looking at just one cluster and comparing against the summary table
+
+clus_comp_test <- met_insular %>% 
+  filter(cluster == 8)
+
+n_distinct(clus_comp_test$primary_topic) # [1] 13
+n_distinct(clus_comp_test$primary_topic_subfield) # [1] 9
+min(clus_comp_test$prank)  # [1] 0.001411117
+max(clus_comp_test$prank)  # [1] 0.006918255
+mean(clus_comp_test$prank)  # [1] 0.002636811
+min(clus_comp_test$btw)  # [1] 0
+max(clus_comp_test$btw)  # [1] 6
+mean(clus_comp_test$btw)  # [1] 1.210526
+
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "Cluster_Comparison_insular_20261106.csv"
+full_output_path <- file.path(output_directory, file_name)
+
+write_excel_csv(clus_comp, file = full_output_path)
+
+```
+
+
+```{r 2c) examine the clusters - details}
+
+# thought I needed to write a function + for-loop to extract the details from each cluster
+  # Nick at DataLab simplified this dramatically just using tidyverse/dplyer (duh!)
+    # see "DataLab_help.rmd"
+
+
+# in this block, re-use the object
+  # change what's being counted
+    # then change the name of output file 
+      # bring into Excel to calculate percent and cumulative percent 
+
+cluster_descrips_insular <- met_insular |> 
+  group_by(cluster) |> 
+  count(primary_topic_subfield) |> 
+  arrange(cluster, -n) 
+
+## ## 
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "Cluster_insular_subfields_20261106.csv"
+full_output_path <- file.path(output_directory, file_name)
+
+write_excel_csv(cluster_descrips_insular, file = full_output_path)
+
+```

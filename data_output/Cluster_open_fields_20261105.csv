@@ -1,0 +1,224 @@
+﻿"cluster","primary_topic_field","n"
+1,"Social Sciences",44
+1,"Health Professions",5
+1,"Medicine",4
+1,"Agricultural and Biological Sciences",1
+1,"Arts and Humanities",1
+1,"Psychology",1
+2,"Social Sciences",44
+2,"Arts and Humanities",6
+2,"Medicine",4
+2,"Health Professions",2
+2,"Psychology",2
+2,"Agricultural and Biological Sciences",1
+2,"Biochemistry, Genetics and Molecular Biology",1
+2,"Environmental Science",1
+3,"Social Sciences",47
+3,"Health Professions",23
+3,"Environmental Science",18
+3,"Agricultural and Biological Sciences",9
+3,"Business, Management and Accounting",4
+3,"Arts and Humanities",3
+3,"Economics, Econometrics and Finance",2
+3,"Engineering",1
+3,"Medicine",1
+4,"Social Sciences",184
+4,"Health Professions",8
+4,"Psychology",7
+4,"Arts and Humanities",6
+4,"Environmental Science",4
+4,"Agricultural and Biological Sciences",3
+4,"Business, Management and Accounting",1
+4,"Computer Science",1
+4,"Earth and Planetary Sciences",1
+4,"Economics, Econometrics and Finance",1
+4,"Engineering",1
+4,"Nursing",1
+5,"Social Sciences",73
+5,"Health Professions",19
+5,"Medicine",10
+5,"Psychology",5
+5,"Environmental Science",3
+5,"Arts and Humanities",2
+5,"Biochemistry, Genetics and Molecular Biology",2
+5,"Agricultural and Biological Sciences",1
+5,"Decision Sciences",1
+5,"Economics, Econometrics and Finance",1
+5,"Engineering",1
+5,"Immunology and Microbiology",1
+6,"Social Sciences",164
+6,"Arts and Humanities",8
+6,"Health Professions",8
+6,"Business, Management and Accounting",2
+6,"Psychology",2
+6,"Computer Science",1
+6,"Decision Sciences",1
+7,"Social Sciences",111
+7,"Health Professions",16
+7,"Psychology",7
+7,"Medicine",4
+7,"Arts and Humanities",2
+7,"Computer Science",2
+7,"Decision Sciences",2
+7,"Economics, Econometrics and Finance",2
+7,"Environmental Science",2
+7,"Biochemistry, Genetics and Molecular Biology",1
+7,"Engineering",1
+7,"Neuroscience",1
+8,"Environmental Science",114
+8,"Social Sciences",24
+8,"Health Professions",14
+8,"Agricultural and Biological Sciences",2
+8,"Arts and Humanities",2
+8,"Business, Management and Accounting",2
+8,"Economics, Econometrics and Finance",2
+8,"Psychology",2
+8,"Engineering",1
+9,"Social Sciences",35
+9,"Health Professions",2
+9,"Arts and Humanities",1
+9,"Environmental Science",1
+9,"Medicine",1
+9,"Psychology",1
+10,"Social Sciences",96
+10,"Engineering",6
+10,"Arts and Humanities",3
+10,"Environmental Science",3
+10,"Agricultural and Biological Sciences",2
+10,"Economics, Econometrics and Finance",2
+10,"Business, Management and Accounting",1
+10,"Mathematics",1
+11,"Social Sciences",104
+11,"Health Professions",12
+11,"Arts and Humanities",4
+11,"Psychology",4
+11,"Environmental Science",3
+11,"Medicine",3
+11,"Economics, Econometrics and Finance",1
+11,"Neuroscience",1
+12,"Environmental Science",40
+12,"Social Sciences",34
+12,"Health Professions",15
+12,"Agricultural and Biological Sciences",5
+12,"Arts and Humanities",2
+12,"Decision Sciences",2
+12,"Earth and Planetary Sciences",2
+12,"Economics, Econometrics and Finance",2
+12,"Engineering",2
+12,"Biochemistry, Genetics and Molecular Biology",1
+12,"Business, Management and Accounting",1
+12,"Nursing",1
+13,"Social Sciences",39
+13,"Environmental Science",11
+13,"Business, Management and Accounting",5
+13,"Decision Sciences",1
+13,"Energy",1
+13,"Health Professions",1
+14,"Social Sciences",22
+14,"Arts and Humanities",10
+14,"Agricultural and Biological Sciences",1
+14,"Economics, Econometrics and Finance",1
+14,"Health Professions",1
+14,"Psychology",1
+15,"Environmental Science",102
+15,"Social Sciences",23
+15,"Health Professions",20
+15,"Business, Management and Accounting",7
+15,"Agricultural and Biological Sciences",6
+15,"Economics, Econometrics and Finance",4
+15,"Decision Sciences",2
+15,"Engineering",2
+15,"Arts and Humanities",1
+15,"Immunology and Microbiology",1
+15,"Psychology",1
+16,"Social Sciences",68
+16,"Health Professions",5
+16,"Economics, Econometrics and Finance",4
+16,"Engineering",4
+16,"Environmental Science",4
+16,"Medicine",3
+16,"Nursing",2
+16,"Psychology",2
+16,"Business, Management and Accounting",1
+16,"Energy",1
+17,"Agricultural and Biological Sciences",64
+17,"Environmental Science",64
+17,"Social Sciences",46
+17,"Economics, Econometrics and Finance",11
+17,"Health Professions",11
+17,"Nursing",3
+17,"Computer Science",2
+17,"Psychology",2
+17,"Decision Sciences",1
+18,"Environmental Science",11
+18,"Social Sciences",4
+18,"Engineering",2
+18,"Decision Sciences",1
+18,"Economics, Econometrics and Finance",1
+19,"Social Sciences",153
+19,"Environmental Science",127
+19,"Engineering",33
+19,"Energy",17
+19,"Economics, Econometrics and Finance",16
+19,"Health Professions",15
+19,"Agricultural and Biological Sciences",6
+19,"Business, Management and Accounting",3
+19,"Arts and Humanities",2
+19,"Psychology",1
+20,"Social Sciences",45
+20,"Psychology",14
+20,"Health Professions",5
+20,"Arts and Humanities",2
+20,"Environmental Science",2
+20,"Mathematics",2
+20,"Medicine",2
+20,"Agricultural and Biological Sciences",1
+20,"Decision Sciences",1
+21,"Social Sciences",11
+21,"Arts and Humanities",1
+21,"Business, Management and Accounting",1
+21,"Psychology",1
+22,"Social Sciences",22
+22,"Business, Management and Accounting",12
+22,"Engineering",1
+23,"Environmental Science",34
+23,"Energy",4
+23,"Social Sciences",4
+23,"Engineering",2
+23,"Computer Science",1
+23,"Economics, Econometrics and Finance",1
+23,"Health Professions",1
+24,"Environmental Science",61
+24,"Engineering",8
+24,"Social Sciences",6
+24,"Health Professions",2
+24,"Agricultural and Biological Sciences",1
+24,"Decision Sciences",1
+25,"Social Sciences",50
+25,"Environmental Science",44
+25,"Energy",6
+25,"Engineering",6
+25,"Agricultural and Biological Sciences",4
+25,"Economics, Econometrics and Finance",4
+25,"Arts and Humanities",1
+25,"Business, Management and Accounting",1
+26,"Environmental Science",13
+26,"Social Sciences",6
+26,"Economics, Econometrics and Finance",4
+26,"Arts and Humanities",1
+26,"Engineering",1
+27,"Social Sciences",66
+27,"Decision Sciences",2
+27,"Business, Management and Accounting",1
+27,"Health Professions",1
+27,"Psychology",1
+28,"Environmental Science",21
+28,"Social Sciences",11
+28,"Business, Management and Accounting",3
+28,"Agricultural and Biological Sciences",1
+28,"Biochemistry, Genetics and Molecular Biology",1
+28,"Engineering",1
+29,"Environmental Science",20
+29,"Energy",3
+29,"Engineering",3
+29,"Social Sciences",2

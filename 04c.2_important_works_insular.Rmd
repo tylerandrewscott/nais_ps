@@ -1,0 +1,162 @@
+---
+title: "04c.2_important_works_insular"
+author: "Mackenzie Johnson"
+date: "2026-11-05"
+output: html_document
+---
+
+  
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+# knitr::opts_chunk$set(eval = FALSE)
+# knitr::opts_chunk$set(include = FALSE)
+
+```
+
+```{r libraries}
+
+# install.packages(c("visNetwork", 
+  #                  "sfnetworks", 
+    #                "tidygraph"))
+
+# install.packages("ggraph")
+# install.packages("udpipe")  
+      # Tokenising, Lemmatising, Tagging and Dependency Parsing of raw text in TIF format
+
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(ggraph)
+library(igraph)
+library(knitr)
+# library(Matrix)
+# library(pbapply)
+library(sfnetworks)
+# library(slam)  # Sparse Lightweight Arrays and Matrices
+library(stringr)
+library(tidygraph)
+library(tidyverse)
+library(udpipe)
+library(visNetwork)
+
+```
+
+
+```{r SetWD}
+
+getwd()  # [1] "C:/Users/Owner/Documents/Research/R_Projects/nais_ps"
+# setwd() 
+```
+
+
+```{r GetData}
+
+# nodelist (aka "metadata")
+
+readRDS(file = "data/4a.2_indig_insular_nodelist.rds")
+
+```
+
+In step 4, I'm going to investigate the clusters identified by the clustering algorithm.  
+ - How similar or dissimilar are they with respect to the primary topics (and the fields and subfields to which those topics belong) 
+ - What are the most important works for each cluster based on page rank and betweenness.
+ 
+To simplify this process, 
+ 
+Workflow:
+Step 1)  Add attributes in the node-list for the network characteristics:  cluster membership, page rank, and betweenness metrics.  [This was done in "04a_cluster_nodelists.rmd".]
+
+Step 2) Explore the new node-list.
+  
+  a) overall descriptions of works (journal source, source group)
+  b) group by cluster and summarize to compare average page rank and betweenness
+  c) for each cluster, look at the primary_topic variables ==> FOR LOOP!!
+  
+
+ Step 3) extracting information from the new node-list
+
+  * find the papers with the highest page-rank and betweenness metrics
+  * use "highest" variable to find the works in each group with the highest page-rank values
+       
+       
+```{r 3) extracting specific works based on network}
+
+imp_works_insular_prank <- met_insular  |>  
+  group_by(cluster) |> 
+  slice_max(order_by = prank, n = 1) |> 
+  select(sid_prank = source_id, 
+         sg_prank = source_group, 
+         wid_prank = work_id, 
+         doi_prank = doi, 
+         title_prank = title, 
+         pubyear_prank = publication_year, 
+         citedby_prank = cited_by_count, 
+         fwci_prank = fwci, 
+         pt_prank = primary_topic,
+         pt_sub_prank = primary_topic_subfield, 
+         pt_field_prank = primary_topic_field, 
+         pt_domain_prank = primary_topic_domain,
+         cluster,
+         prank)
+
+imp_works_insular_btw <- met_insular  |>  
+  group_by(cluster) |> 
+  slice_max(order_by = btw, n = 1) |> 
+  select(sid_btw = source_id, 
+         sg_btw = source_group, 
+         wid_btw = work_id, 
+         doi_btw = doi, 
+         title_btw = title, 
+         pubyear_btw = publication_year, 
+         citedby_btw = cited_by_count, 
+         fwci_btw = fwci, 
+         pt_btw = primary_topic,
+         pt_sub_btw = primary_topic_subfield, 
+         pt_field_btw = primary_topic_field, 
+         pt_domain_btw = primary_topic_domain,
+         cluster,
+         btw)
+  
+# using "bind_cols" on these didn't work because there were tie values in some clusters
+  # which made the columns unequal in length
+
+# too lazy to add "na" values and make them the same length
+
+# Google ai said to try the following, but it was definitely mistaken - not in the package
+    # install.packages("qpcR")
+    # library(qpcR)
+
+imp_works_insular <- merge(imp_works_insular_prank, imp_works_insular_btw)
+
+# this will work - can go back in and easily correct the duplicate values
+
+# saveRDS(imp_works_insular, "data/important_works_insular.rds")
+
+output_directory <- "C:/Users/Owner/Documents/Research/R_Projects/nais_ps/data_output/"
+file_name <- "Important_Works_insular_20261002.csv"
+full_output_path <- file.path(output_directory, file_name)
+
+write_excel_csv(imp_works_insular, file = full_output_path)
+
+```
+
+
+Step 4) visualize the network and use different node attributes
+
+```{r 4) network visualization}
+
+# Got some visualization code from Sara!  
+
+ggraph(cit_graph_big, layout = "fr") +
+geom_edge_fan(
+end_cap = circle(1, "mm"),
+color = "#000000",
+width = 0.3,
+arrow = arrow(angle = 15, length = unit(0.07, "inches"), ends = "last", type = "closed"))+
+geom_node_point(alpha = 0.2) +
+labs(title = "NAIS-themed Citations (insular network)") + theme_void()
+
+```
+
